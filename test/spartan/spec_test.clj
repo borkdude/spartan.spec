@@ -13,3 +13,6 @@
 (deftest ?-test
   (is (= {:i 1 :j 2} (s/conform (s/cat :i number? :j (s/? number?)) [1 2])))
   (is (= {:i 1} (s/conform (s/cat :i number? :j (s/? number?)) [1]))))
+
+(deftest def-test
+  (is (true? (do (s/def ::int int?) (s/valid? ::int 1)))))

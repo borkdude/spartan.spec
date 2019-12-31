@@ -118,7 +118,8 @@
     (regex? spec) (assoc spec ::name name)
     ;; TODO: add clojure.lang.IObj to babashka
     #_(instance? clojure.lang.IObj spec)
-    #_(with-meta spec (assoc (meta spec) ::name name))))
+    :else
+    (with-meta spec (assoc (meta spec) ::name name))))
 
 (defn- spec-name [spec]
   (cond
@@ -345,3 +346,33 @@
   ([spec x form]
    (let [spec (specize spec form)]
      (not (invalid? (conform* spec x))))))
+
+(defn def-impl
+  "Do not call this directly, use 'def'"
+  [k form spec]
+  (clojure.core/assert (clojure.core/and (ident? k) (namespace k)) "k must be namespaced keyword or resolvable symbol")
+  (if (nil? spec)
+    (swap! registry-ref dissoc k)
+    (let [spec (if (clojure.core/or (spec? spec) (regex? spec) (get @registry-ref spec))
+                 spec
+                 (spec-impl form spec))]
+      (swap! registry-ref assoc k (with-name spec k))))
+  k)
+
+#_(defn- ns-qualify
+  "Qualify symbol s by resolving it or using the current *ns*."
+  [s]
+  (if-let [ns-sym (some-> s namespace symbol)]
+    (clojure.core/or (some-> (get (ns-aliases *ns*) ns-sym) str (symbol (name s)))
+          s)
+    (symbol (str (.name *ns*)) (str s))))
+
+(defmacro def
+  "Given a namespace-qualified keyword or resolvable symbol k, and a
+  spec, spec-name, predicate or regex-op makes an entry in the
+  registry mapping k to the spec. Use nil to remove an entry in
+  the registry for k."
+  [k spec-form]
+  (let [k (if (symbol? k) (throw (Exception. "Only keywords allowed for now"))
+              #_(ns-qualify k) k)]
+    `(def-impl '~k '~(res spec-form) ~spec-form)))
