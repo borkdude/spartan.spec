@@ -3,7 +3,7 @@
   (:require [clojure.walk :as walk]))
 
 ;; TODO: make into ifn? once sci has ifn?
-(def ifn? fn?)
+(def ifn? (some-fn fn? coll?))
 
 (defn invalid?
   "tests the validity of a conform return value"

@@ -4,7 +4,8 @@
 
 (deftest pred-test
   (is (= 1 (s/conform int? 1)))
-  (is (s/invalid? (s/conform string? 1))))
+  (is (s/invalid? (s/conform string? 1)))
+  (is (= "--opts" (s/conform #{"--opts"} "--opts"))))
 
 (deftest cat-test
   (is (= {:a 1, :b "foo"} (s/conform (s/cat :a int? :b string?) [1 "foo"])))
