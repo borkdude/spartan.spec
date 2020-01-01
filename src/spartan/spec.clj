@@ -320,7 +320,7 @@
   Returns a spec that returns the conformed value. Successive
   conformed values propagate through rest of predicates."
   [& pred-forms]
-  `(and-spec-impl '~(mapv res pred-forms) ~(vec pred-forms) nil))
+  `(and-spec-impl '~(mapv res pred-forms) ~(vec pred-forms)))
 
 ;; 505
 (defmacro merge
@@ -593,8 +593,39 @@
       ret)))
 
 ;; 1153
-;; and-spec-impl: TODO
-
+(defn ^:skip-wiki and-spec-impl
+  "Do not call this directly, use 'and'"
+  [forms preds]
+  (let [specs (delay (mapv specize preds forms))
+        cform
+        (case (count preds)
+              2 (fn [x]
+                  (let [specs @specs
+                        ret (conform* (specs 0) x)]
+                    (if (invalid? ret)
+                      ::invalid
+                      (conform* (specs 1) ret))))
+              3 (fn [x]
+                  (let [specs @specs
+                        ret (conform* (specs 0) x)]
+                    (if (invalid? ret)
+                      ::invalid
+                      (let [ret (conform* (specs 1) ret)]
+                        (if (invalid? ret)
+                          ::invalid
+                          (conform* (specs 2) ret))))))
+              (fn [x]
+                (let [specs @specs]
+                  (loop [ret x i 0]
+                    (if (< i (count specs))
+                      (let [nret (conform* (specs i) ret)]
+                        (if (invalid? nret)
+                          ::invalid
+                          ;;propagate conformed values
+                          (recur nret (inc i))))
+                      ret)))))]
+    {:type ::spec
+     :cform cform}))
 
 ;; 1197
 ;; merge-spec-impl: TODO

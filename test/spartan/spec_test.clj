@@ -16,6 +16,10 @@
   (is (= [:a 1] (s/conform (s/alt :a int? :b string?) [1])))
   (is (s/invalid? (s/conform (s/alt :a int? :b string?) 1))))
 
+(deftest and-test
+  (is (= 6 (s/conform (s/and number? #(> % 5)) 6)))
+  (is (s/invalid? (s/conform (s/and number? #(> % 5)) 5))))
+
 (deftest or-test
   (is (= [:a 1] (s/conform (s/or :a int? :b string?) 1)))
   (is (s/invalid? (s/conform (s/or :a int? :b string?) {:a 1}))))
