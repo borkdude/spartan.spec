@@ -285,7 +285,7 @@
         pred-exprs [`(map? ~gx)]
         pred-exprs (into pred-exprs (parse-req req identity))
         pred-exprs (into pred-exprs (parse-req req-un unk))
-        keys-pred `(fn* [~gx] (c/and ~@pred-exprs))
+        keys-pred `(fn* [~gx] (clojure.core/and ~@pred-exprs))
         pred-exprs (mapv (fn [e] `(fn* [~gx] ~e)) pred-exprs)
         pred-forms (walk/postwalk res pred-exprs)]
     ;; `(map-spec-impl ~req-keys '~req ~opt '~pred-forms ~pred-exprs ~gen)
@@ -519,6 +519,32 @@
 
 ;; 788
 ;; explain-1: TODO
+
+;; 842
+(defn map-spec-impl
+  "Do not call this directly, use 'spec' with a map argument"
+  [{:keys [req-un opt-un keys-pred pred-exprs opt-keys req-specs req req-keys opt-specs pred-forms opt gfn]
+    :as argm}]
+  (let [k->s (zipmap (concat req-keys opt-keys) (concat req-specs opt-specs))
+        keys->specnames #(clojure.core/or (k->s %) %)
+        id (java.util.UUID/randomUUID)]
+    {:type ::spec
+     :id id
+     :cform  (fn [m]
+               (if (keys-pred m)
+                 (let [reg (registry)]
+                   (loop [ret m, [[k v] & ks :as keys] m]
+                     (if keys
+                       (let [sname (keys->specnames k)]
+                         (if-let [s (get reg sname)]
+                           (let [cv (conform s v)]
+                             (if (invalid? cv)
+                               ::invalid
+                               (recur (if (identical? cv v) ret (assoc ret k cv))
+                                      ks)))
+                           (recur ret ks)))
+                       ret)))
+                 ::invalid))}))
 
 ;; 915
 (defn spec-impl [form pred]

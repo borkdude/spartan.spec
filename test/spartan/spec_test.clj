@@ -39,3 +39,8 @@
 
 (deftest def-test
   (is (true? (do (s/def ::int int?) (s/valid? ::int 1)))))
+
+(deftest keys-test
+  (s/def ::a (s/keys :req-un [::b ::c]))
+  (s/def ::b (s/cat :i int? :j int?))
+  (is (= {:c 2, :b {:i 1, :j 2}} (s/conform ::a {:b [1 2] :c 2}))))
