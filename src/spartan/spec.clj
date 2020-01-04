@@ -853,3 +853,18 @@
     (if-let [dp (deriv p x)]
       (recur dp xs)
       ::invalid)))
+
+;; 1836
+(defn nilable-impl
+  "Do not call this directly, use 'nilable'"
+  [form pred]
+  (let [spec (delay (specize pred form))]
+    {:type ::spec
+     :cform (fn [x] (if (nil? x) nil (conform* @spec x)))}))
+
+;; 1862
+(defmacro nilable
+  "returns a spec that accepts nil and values satisfying pred"
+  [pred]
+  (let [pf (res pred)]
+    `(nilable-impl '~pf ~pred)))

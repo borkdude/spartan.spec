@@ -44,3 +44,8 @@
   (s/def ::a (s/keys :req-un [::b ::c]))
   (s/def ::b (s/cat :i int? :j int?))
   (is (= {:c 2, :b {:i 1, :j 2}} (s/conform ::a {:b [1 2] :c 2}))))
+
+(deftest nilable-test
+  (is (s/valid? (s/nilable int?) nil))
+  (is (= {:i 1} (s/conform (s/cat :i (s/nilable int?)) [1])))
+  (is (= {:i nil} (s/conform (s/cat :i (s/nilable int?)) [nil]))))
