@@ -64,9 +64,12 @@
   (is (= '[1 2 3] (s/conform (s/coll-of int?) [1 2 3])))
   (is (s/invalid? (s/conform (s/coll-of int?) [1 2 "a"]))))
 
-(s/check-asserts true)
+(deftest fn-literal-in-spec-test
+  (s/def ::kws (s/and keyword? #(= (namespace %) "my.domain")))
+  (is (s/valid? ::kws :my.domain/name)))
 
 (deftest assert-test
+  (s/check-asserts true)
   (is (str/includes? (try (s/assert int? "foo")
                           (catch clojure.lang.ExceptionInfo e
                             (ex-message e)))
