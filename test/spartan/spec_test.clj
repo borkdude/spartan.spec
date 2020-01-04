@@ -1,7 +1,8 @@
 (ns spartan.spec-test
   (:require ;; [clojure.spec.alpha :as s]
-            [spartan.spec :as s]
-            [spartan.test :as t :refer [deftest is]]))
+   [spartan.spec :as s]
+   [spartan.test :as t :refer [deftest is]]
+   [clojure.string :as str]))
 
 (deftest pred-test
   (is (= 1 (s/conform int? 1)))
@@ -62,3 +63,11 @@
 (deftest coll-of-test
   (is (= '[1 2 3] (s/conform (s/coll-of int?) [1 2 3])))
   (is (s/invalid? (s/conform (s/coll-of int?) [1 2 "a"]))))
+
+(s/check-asserts true)
+
+(deftest assert-test
+  (is (str/includes? (try (s/assert int? "foo")
+                          (catch clojure.lang.ExceptionInfo e
+                            (ex-message e)))
+                     "assertion failed")))

@@ -964,3 +964,60 @@
   [pred]
   (let [pf (res pred)]
     `(nilable-impl '~pf ~pred)))
+
+;; 1941
+#_(defonce
+  ^{:dynamic true
+    :doc "If true, compiler will enable spec asserts, which are then
+subject to runtime control via check-asserts? If false, compiler
+will eliminate all spec assert overhead. See 'assert'.
+Initially set to boolean value of clojure.spec.compile-asserts
+system property. Defaults to true."}
+  *compile-asserts*
+  (not= "false" (System/getProperty "clojure.spec.compile-asserts")))
+
+(defonce ^:dynamic *check-spec-asserts* false)
+
+;; 1952
+(defn check-asserts?
+  "Returns the value set by check-asserts."
+  []
+  *check-spec-asserts*)
+
+;; 1957
+(defn check-asserts
+  "Enable or disable spec asserts that have been compiled
+with '*compile-asserts*' true.  See 'assert'.
+Initially set to boolean value of clojure.spec.check-asserts
+system property. Defaults to false."
+  [flag]
+  (alter-var-root #'*check-spec-asserts* (constantly flag)))
+
+;; 1966
+(defn assert*
+  "Do not call this directly, use 'assert'."
+  [spec x]
+  (if (valid? spec x)
+    x
+    (let [ed (clojure.core/merge (assoc {} #_(explain-data* spec [] [] [] x)
+                                        ::failure :assertion-failed))]
+      (throw (ex-info
+              (str "Spec assertion failed\n" (with-out-str ed #_(explain-out ed)))
+              ed)))))
+
+;; 1977
+(defmacro assert
+  "spec-checking assert expression. Returns x if x is valid? according
+to spec, else throws an ex-info with explain-data plus ::failure of
+:assertion-failed.
+Can be disabled at either compile time or runtime:
+If *compile-asserts* is false at compile time, compiles to x. Defaults
+to value of 'clojure.spec.compile-asserts' system property, or true if
+not set.
+If (check-asserts?) is false at runtime, always returns x. Defaults to
+value of 'clojure.spec.check-asserts' system property, or false if not
+set. You can toggle check-asserts? with (check-asserts bool)."
+  [spec x]
+  `(if *check-spec-asserts*
+     (assert* ~spec ~x)
+     ~x))
