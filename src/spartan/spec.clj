@@ -105,20 +105,25 @@
    (when (ident? spec-or-k)
      (throw (Exception. (str "Unable to resolve spec: " spec-or-k))))))
 
+;; 131
+(defn- fn-sym [^Object f]
+  (let [[_ f-ns f-n] (re-matches #"(.*)\$(.*?)(__[0-9]+)?" (-> f .getClass .getName) #_(.. f getClass getName))]
+    ;; check for anonymous function
+    (when (not= "fn" f-n)
+      (symbol f-ns f-n #_(clojure.lang.Compiler/demunge f-ns) #_(clojure.lang.Compiler/demunge f-n)))))
+
 (defn specize*
   ([x] (specize* x nil))
   ([x form]
    (cond (keyword? x) (reg-resolve! x)
          (symbol? x) (reg-resolve! x)
-         (set? x) (spec-impl form x)
+         (set? x) (spec-impl form x nil nil)
          (regex? x) (assoc x :type ::spec)
          :else (if (clojure.core/and (not (map? x)) (ifn? x))
-                 (if-let [s false
-                          ;; TODO
-                          #_(fn-sym o)]
-                   (spec-impl s x)
-                   (spec-impl ::unknown x))
-                 (spec-impl ::unknown x)))))
+                 (if-let [s (fn-sym x)]
+                   (spec-impl s x nil nil)
+                   (spec-impl ::unknown x nil nil))
+                 (spec-impl ::unknown x nil nil)))))
 
 ;; 158
 (defn- specize
@@ -157,7 +162,22 @@
 ;; form: TODO
 
 ;; 186
-;; abbrev: TODO
+(defn abbrev [form]
+  (cond
+    (seq? form)
+    (walk/postwalk (fn [form]
+                     (cond
+                       (clojure.core/and (symbol? form) (namespace form))
+                       (-> form name symbol)
+
+                       (clojure.core/and (seq? form) (= 'fn (first form)) (= '[%] (second form)))
+                       (last form)
+                       :else form))
+                   form)
+
+    (clojure.core/and (symbol? form) (namespace form))
+    (-> form name symbol)
+    :else form))
 
 ;; 205:
 ;; describe: TODO
@@ -165,17 +185,68 @@
 ;; 210:
 ;; with-gen: TODO
 
+(defn explain* [spec path via in x]
+  (let [{explain-f :explain} spec]
+    (explain-f spec path via in x)))
+
 ;; 218:
-;; explain-data*: TODO
+(defn explain-data* [spec path via in x]
+  (let [probs (explain* (specize spec) path via in x)]
+    (when-not (empty? probs)
+      {::problems probs
+       ::spec spec
+       ::value x})))
+
+;; 225:
+(defn explain-data
+  "Given a spec and a value x which ought to conform, returns nil if x
+  conforms, else a map with at least the key ::problems whose value is
+  a collection of problem-maps, where problem-map has at least :path :pred and :val
+  keys describing the predicate and the value that failed at that
+  path."
+  [spec x]
+  (explain-data* spec [] (if-let [name (spec-name spec)] [name] []) [] x))
 
 ;; 234:
-;; explain-printer: TODO
+(defn explain-printer
+  "Default printer for explain-data. nil indicates a successful validation."
+  [ed]
+  (if ed
+    (let [problems (->> (::problems ed)
+                        (sort-by #(- (count (:in %))))
+                        (sort-by #(- (count (:path %)))))]
+      (doseq [{:keys [path pred val reason via in] :as prob} problems]
+        (pr val)
+        (print " - failed: ")
+        (if reason (print reason) (pr (abbrev pred)))
+        (when-not (empty? in)
+          (print (str " in: " (pr-str in))))
+        (when-not (empty? path)
+          (print (str " at: " (pr-str path))))
+        (when-not (empty? via)
+          (print (str " spec: " (pr-str (last via)))))
+        (doseq [[k v] prob]
+          (when-not (#{:path :pred :val :reason :via :in} k)
+            (print "\n\t" (pr-str k) " ")
+            (pr v)))
+        (newline)))
+    (println "Success!")))
 
 ;; 259:
-;; *explain-out*: TODO
+(def ^:dynamic *explain-out* explain-printer)
+
+;; 261:
+(defn explain-out
+  "Prints explanation data (per 'explain-data') to *out* using the printer in *explain-out*,
+   by default explain-printer."
+  [ed]
+  (*explain-out* ed))
 
 ;; 267:
-;; explain: TODO
+(defn explain
+  "Given a spec and a value that fails to conform, prints an explanation to *out*."
+  [spec x]
+  (explain-out (explain-data spec x)))
 
 ;; 277
 (declare valid?)
@@ -221,7 +292,7 @@
     (swap! registry-ref dissoc k)
     (let [spec (if (clojure.core/or (spec? spec) (regex? spec) (get @registry-ref spec))
                  spec
-                 (spec-impl form spec))]
+                 (spec-impl form spec nil nil))]
       (swap! registry-ref assoc k (with-name spec k))))
   k)
 
@@ -552,10 +623,15 @@
                  ::invalid))}))
 
 ;; 915
-(defn spec-impl [form pred]
-  {:type ::spec
-   :form form
-   :pred pred})
+(defn spec-impl
+  ([form pred gfn cpred?] (spec-impl form pred gfn cpred? nil))
+  ([form pred gfn cpred? unc]
+   {:type ::spec
+    :form form
+    :pred pred
+    :explain (fn [_ path via in x]
+               (when (invalid? (dt pred x form cpred?))
+                 [{:path path :pred form :val x :via via :in in}]))}))
 
 ;; 998
 (defn ^:skip-wiki tuple-impl

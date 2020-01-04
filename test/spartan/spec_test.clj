@@ -68,6 +68,9 @@
   (s/def ::kws (s/and keyword? #(= (namespace %) "my.domain")))
   (is (s/valid? ::kws :my.domain/name)))
 
+(deftest explain-test
+  (prn (s/explain int? "foo")))
+
 (deftest assert-test
   (s/check-asserts true)
   (is (str/includes? (try (s/assert int? "foo")
