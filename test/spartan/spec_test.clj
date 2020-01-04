@@ -53,3 +53,12 @@
 (deftest every-test
   (is (= '[1 2 3] (s/conform (s/every int?) [1 2 3])))
   (is (s/invalid? (s/conform (s/every int?) [1 2 "a"]))))
+
+(deftest every-kv-test
+  (is (= '{:foo "foo" :bar "bar"}
+         (s/conform (s/every-kv keyword? string?) {:foo "foo" :bar "bar"})))
+  (is (s/invalid? (s/conform (s/every-kv keyword? string?) {:foo 1 :bar "bar"}))))
+
+(deftest coll-of-test
+  (is (= '[1 2 3] (s/conform (s/coll-of int?) [1 2 3])))
+  (is (s/invalid? (s/conform (s/coll-of int?) [1 2 "a"]))))

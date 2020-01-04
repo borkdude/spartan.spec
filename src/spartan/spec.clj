@@ -139,7 +139,7 @@
           (re-conform spec (seq x))
           ::invalid)
         (:cform spec)
-        ((:cform spec) x)
+        ((:cform spec) spec x)
         :else
         (let [pred (:pred spec)
               ret (pred x)]
@@ -535,7 +535,7 @@
         id (java.util.UUID/randomUUID)]
     {:type ::spec
      :id id
-     :cform  (fn [m]
+     :cform  (fn [_ m]
                (if (keys-pred m)
                  (let [reg (registry)]
                    (loop [ret m, [[k v] & ks :as keys] m]
@@ -558,14 +558,31 @@
    :pred pred})
 
 ;; 998
-;; tuple-impl: TODO
+(defn ^:skip-wiki tuple-impl
+  "Do not call this directly, use 'tuple'"
+  ([forms preds] (tuple-impl forms preds nil))
+  ([forms preds gfn]
+     (let [specs (delay (mapv specize preds forms))
+           cnt (count preds)]
+       {:type ::spec
+        :cform (fn [_ x]
+                 (let [specs @specs]
+                   (if-not (clojure.core/and (vector? x)
+                                             (= (count x) cnt))
+                     ::invalid
+                     (loop [ret x, i 0]
+                       (if (= i cnt)
+                         ret
+                         (let [v (x i)
+                               cv (conform* (specs i) v)]
+                           (if (invalid? cv)
+                             ::invalid
+                             (recur (if (identical? cv v) ret (assoc ret i cv))
+                                    (inc i)))))))))})))
 
 ;; 1060
 (defn- tagged-ret [tag ret]
-  ;; TODO: add clojure.lang.MapEntry to bb
-  #_(clojure.lang.MapEntry. tag ret)
-  [tag ret])
-
+  (clojure.lang.MapEntry. tag ret))
 
 ;; 1063
 (defn or-spec-impl
@@ -608,7 +625,7 @@
                         ::invalid)))))]
     {:type ::spec
      :id id
-     :cform cform}))
+     :cform (fn [_ x] (cform x))}))
 
 ;; 1130
 (defn- and-preds [x preds forms]
@@ -656,7 +673,7 @@
                           (recur nret (inc i))))
                       ret)))))]
     {:type ::spec
-     :cform cform}))
+     :cform (fn [_ x] (cform x))}))
 
 ;; 1197
 ;; merge-spec-impl: TODO
@@ -704,7 +721,7 @@
 
                    :else [#(empty (clojure.core/or conform-into %)) addcv identity]))]
        {:type ::spec
-        :cform (fn [x]
+        :cform (fn [_ x]
                  (let [spec @spec]
                    (cond
                      (not (cpred x)) ::invalid
@@ -939,7 +956,7 @@
   [form pred]
   (let [spec (delay (specize pred form))]
     {:type ::spec
-     :cform (fn [x] (if (nil? x) nil (conform* @spec x)))}))
+     :cform (fn [_ x] (if (nil? x) nil (conform* @spec x)))}))
 
 ;; 1862
 (defmacro nilable
