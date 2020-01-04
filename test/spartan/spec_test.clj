@@ -49,3 +49,7 @@
   (is (s/valid? (s/nilable int?) nil))
   (is (= {:i 1} (s/conform (s/cat :i (s/nilable int?)) [1])))
   (is (= {:i nil} (s/conform (s/cat :i (s/nilable int?)) [nil]))))
+
+(deftest every-test
+  (is (= '[1 2 3] (s/conform (s/every int?) [1 2 3])))
+  (is (s/invalid? (s/conform (s/every int?) [1 2 "a"]))))

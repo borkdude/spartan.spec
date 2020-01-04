@@ -14,6 +14,11 @@
   (:refer-clojure :exclude [+ * and assert or cat def keys merge])
   (:require [clojure.walk :as walk]))
 
+;; 36
+(def ^:dynamic *coll-check-limit*
+  "The number of elements validated in a collection spec'ed with 'every'"
+  101)
+
 ;; 52
 (defonce ^:private registry-ref (atom {}))
 
@@ -354,13 +359,13 @@
                  count (conj `(= ~count (bounded-count ~count ~gx)))
 
                  (clojure.core/or min-count max-count)
-                 (conj `(<= (c/or ~min-count 0)
+                 (conj `(<= (clojure.core/or ~min-count 0)
                             (bounded-count (if ~max-count (inc ~max-count) ~min-count) ~gx)
-                            (c/or ~max-count Integer/MAX_VALUE)))
+                            (clojure.core/or ~max-count Integer/MAX_VALUE)))
 
                  distinct
-                 (conj `(c/or (empty? ~gx) (apply distinct? ~gx))))]
-    `(every-impl '~pred ~pred ~(assoc nopts ::cpred `(fn* [~gx] (c/and ~@cpreds))) ~gen)))
+                 (conj `(clojure.core/or (empty? ~gx) (apply distinct? ~gx))))]
+    `(every-impl '~pred ~pred ~(assoc nopts ::cpred `(fn* [~gx] (clojure.core/and ~@cpreds))) ~gen)))
 
 ;; 570
 (defmacro every-kv
@@ -655,6 +660,80 @@
 
 ;; 1197
 ;; merge-spec-impl: TODO
+
+;; 1245
+(clojure.core/def ^:private empty-coll {`vector? [], `set? #{}, `list? (), `map? {}})
+
+;; 1247
+(defn every-impl
+  "Do not call this directly, use 'every', 'every-kv', 'coll-of' or 'map-of'"
+  ([form pred opts] (every-impl form pred opts nil))
+  ([form pred {conform-into :into
+               describe-form ::describe
+               :keys [kind ::kind-form count max-count min-count distinct gen-max ::kfn ::cpred
+                      conform-keys ::conform-all]
+               :or {gen-max 20}
+               :as opts}
+    gfn]
+     (let [;; gen-into (if conform-into (empty conform-into) (get empty-coll kind-form))
+           spec (delay (specize pred))
+           check? #(valid? @spec %)
+           kfn (clojure.core/or kfn (fn [i v] i))
+           addcv (fn [ret i v cv] (conj ret cv))
+           cfns (fn [x]
+                  ;;returns a tuple of [init add complete] fns
+                  (cond
+                   (clojure.core/and (vector? x) (clojure.core/or (not conform-into) (vector? conform-into)))
+                   [identity
+                    (fn [ret i v cv]
+                      (if (identical? v cv)
+                        ret
+                        (assoc ret i cv)))
+                    identity]
+
+                   (clojure.core/and (map? x) (clojure.core/or (clojure.core/and kind (not conform-into)) (map? conform-into)))
+                   [(if conform-keys empty identity)
+                    (fn [ret i v cv]
+                      (if (clojure.core/and (identical? v cv) (not conform-keys))
+                        ret
+                        (assoc ret (nth (if conform-keys cv v) 0) (nth cv 1))))
+                    identity]
+
+                   (clojure.core/or (list? conform-into) (seq? conform-into) (clojure.core/and (not conform-into) (clojure.core/or (list? x) (seq? x))))
+                   [(constantly ()) addcv reverse]
+
+                   :else [#(empty (clojure.core/or conform-into %)) addcv identity]))]
+       {:type ::spec
+        :cform (fn [x]
+                 (let [spec @spec]
+                   (cond
+                     (not (cpred x)) ::invalid
+
+                     conform-all
+                     (let [[init add complete] (cfns x)]
+                       (loop [ret (init x), i 0, [v & vs :as vseq] (seq x)]
+                         (if vseq
+                           (let [cv (conform* spec v)]
+                             (if (invalid? cv)
+                               ::invalid
+                               (recur (add ret i v cv) (inc i) vs)))
+                           (complete ret))))
+                     :else
+                     (if (indexed? x)
+                       (let [step (max 1 (long (/ (clojure.core/count x) *coll-check-limit*)))]
+                         (loop [i 0]
+                           (if (>= i (clojure.core/count x))
+                             x
+                             (if (valid? spec (nth x i))
+                               (recur (clojure.core/+ i step))
+                               ::invalid))))
+                       (let [limit *coll-check-limit*]
+                         (loop [i 0 [v & vs :as vseq] (seq x)]
+                           (cond
+                             (clojure.core/or (nil? vseq) (= i limit)) x
+                             (valid? spec v) (recur (inc i) vs)
+                             :else ::invalid)))))))})))
+
 
 ;; 1382
 (defn- accept [x] {::op ::accept :ret x})
