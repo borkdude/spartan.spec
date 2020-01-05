@@ -186,11 +186,12 @@
 ;;    {:prop "-verbose", :val [:b true]}
 ;;    {:prop "-user", :val [:s "joe"]}]
 
-(s/describe ::seq-of-keywords)
+;; TODO
+;; (s/describe ::seq-of-keywords)
 ;;=> (* keyword?)
-(s/describe ::odds-then-maybe-even)
+;; (s/describe ::odds-then-maybe-even)
 ;;=> (cat :odds (+ odd?) :even (? even?))
-(s/describe ::opts)
+;; (s/describe ::opts)
 ;;=> (* (cat :opt keyword? :val boolean?))
 
 (s/def ::even-strings (s/& (s/* string?) #(even? (count %))))
@@ -215,16 +216,17 @@
 (s/conform ::unnested [:names "a" "b" :nums 1 2 3])
 ;;=> {:names-kw :names, :names ["a" "b"], :nums-kw :nums, :nums [1 2 3]}
 
-(defn person-name
+;; TODO: pre and post
+#_(defn person-name
   [person]
   {:pre [(s/valid? ::person person)]
    :post [(s/valid? string? %)]}
   (str (::first-name person) " " (::last-name person)))
 
-(person-name 42)
+;; (person-name 42)
 ;;=> java.lang.AssertionError: Assert failed: (s/valid? :my.domain/person person)
 
-(person-name {::first-name "Bugs" ::last-name "Bunny" ::email "bugs@example.com"})
+;; (person-name {::first-name "Bugs" ::last-name "Bunny" ::email "bugs@example.com"})
 ;; Bugs Bunny
 
 
@@ -234,5 +236,6 @@
     (str (::first-name p) " " (::last-name p))))
 
 (s/check-asserts true)
+(person-name2 42)
 ;; Execution error - invalid arguments to my.domain/person-name at (REPL:3).
 ;; 100 - failed: map?

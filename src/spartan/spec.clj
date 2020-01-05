@@ -132,8 +132,10 @@
 
 ;; 158
 (defn- specize
-  ([s] (clojure.core/or (spec? s) (specize* s)))
-  ([s form] (clojure.core/or (spec? s) (specize* s form))))
+  ([s]
+   (clojure.core/or (spec? s) (specize* s)))
+  ([s form]
+   (clojure.core/or (spec? s) (specize* s form))))
 
 ;; 162
 (defn invalid?
@@ -308,7 +310,7 @@
   (clojure.core/assert (clojure.core/and (ident? k) (namespace k)) "k must be namespaced keyword or resolvable symbol")
   (if (nil? spec)
     (swap! registry-ref dissoc k)
-    (let [spec (if (clojure.core/or (spec? spec) (regex? spec) (get @registry-ref spec))
+    (let [spec (if (clojure.core/or (spec? spec) #_(regex? spec) (get @registry-ref spec))
                  spec
                  (spec-impl form spec nil nil))]
       (swap! registry-ref assoc k (with-name spec k))))
