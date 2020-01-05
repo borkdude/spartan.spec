@@ -7,28 +7,38 @@
 (deftest pred-test
   (is (= 1 (s/conform int? 1)))
   (is (s/invalid? (s/conform string? 1)))
-  (is (= "--opts" (s/conform #{"--opts"} "--opts"))))
+  (is (= "--opts" (s/conform #{"--opts"} "--opts")))
+  (is (= "\"foo\" - failed: int?\n" (with-out-str (s/explain int? "foo")))))
 
 (deftest cat-test
   (is (= {:a 1, :b "foo"} (s/conform (s/cat :a int? :b string?) [1 "foo"])))
-  (is (s/invalid? (s/conform (s/cat :a int? :b string?) [1 "foo" "bar"]))))
+  (is (s/invalid? (s/conform (s/cat :a int? :b string?) [1 "foo" "bar"])))
+  (is (= "1 - failed: string? in: [0] at: [:i]\n" (with-out-str (s/explain (s/cat :i string?) [1])))))
 
 (deftest alt-test
   (is (= [:a 1] (s/conform (s/alt :a int? :b string?) [1])))
-  (is (s/invalid? (s/conform (s/alt :a int? :b string?) 1))))
+  (is (s/invalid? (s/conform (s/alt :a int? :b string?) 1)))
+  (is (= "1 - failed: (or (nil? %) (sequential? %))\n"
+         (with-out-str (s/explain (s/alt :a int? :b string?) 1)))))
 
 (deftest and-test
   (is (= 6 (s/conform (s/and number? #(> % 5)) 6)))
-  (is (s/invalid? (s/conform (s/and number? #(> % 5)) 5))))
+  (is (s/invalid? (s/conform (s/and number? #(> % 5)) 5)))
+  (is (= "5 - failed: (> % 5)\n"
+         (with-out-str (s/explain (s/and number? #(> % 5)) 5)))))
 
 (deftest or-test
   (is (= [:a 1] (s/conform (s/or :a int? :b string?) 1)))
-  (is (s/invalid? (s/conform (s/or :a int? :b string?) {:a 1}))))
+  (is (s/invalid? (s/conform (s/or :a int? :b string?) {:a 1})))
+  (is (= "{:a 1} - failed: int? at: [:a]\n{:a 1} - failed: string? at: [:b]\n"
+         (with-out-str (s/explain (s/or :a int? :b string?) {:a 1})))))
 
 (deftest *-test
   (is (= {:i [1 2 3]} (s/conform (s/cat :i (s/* number?)) [1 2 3])))
   (is (s/invalid? (s/conform (s/cat :i (s/* number?)) [1 2 3 "foo"])))
-  (is (s/invalid? (s/conform (s/cat :i (s/* number?)) 1))))
+  (is (s/invalid? (s/conform (s/cat :i (s/* number?)) 1)))
+  (is (= "\"foo\" - failed: number? in: [3] at: [:i]\n"
+         (with-out-str (s/explain (s/cat :i (s/* number?)) [1 2 3 "foo"])))))
 
 (deftest ?-test
   (is (= {:i 1 :j 2} (s/conform (s/cat :i number? :j (s/? number?)) [1 2])))
@@ -67,9 +77,6 @@
 (deftest fn-literal-in-spec-test
   (s/def ::kws (s/and keyword? #(= (namespace %) "my.domain")))
   (is (s/valid? ::kws :my.domain/name)))
-
-(deftest explain-test
-  (prn (s/explain int? "foo")))
 
 (deftest assert-test
   (s/check-asserts true)

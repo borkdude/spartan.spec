@@ -12,7 +12,8 @@
 
 (ns spartan.spec
   (:refer-clojure :exclude [+ * and assert or cat def keys merge])
-  (:require [clojure.walk :as walk]))
+  (:require [clojure.walk :as walk]
+            [clojure.main :refer [demunge]]))
 
 ;; 36
 (def ^:dynamic *coll-check-limit*
@@ -110,7 +111,7 @@
   (let [[_ f-ns f-n] (re-matches #"(.*)\$(.*?)(__[0-9]+)?" (-> f .getClass .getName) #_(.. f getClass getName))]
     ;; check for anonymous function
     (when (not= "fn" f-n)
-      (symbol f-ns f-n #_(clojure.lang.Compiler/demunge f-ns) #_(clojure.lang.Compiler/demunge f-n)))))
+      (symbol (demunge f-ns) (demunge f-n) #_(clojure.lang.Compiler/demunge f-ns) #_(clojure.lang.Compiler/demunge f-n)))))
 
 (defn specize*
   ([x] (specize* x nil))
@@ -118,7 +119,7 @@
    (cond (keyword? x) (reg-resolve! x)
          (symbol? x) (reg-resolve! x)
          (set? x) (spec-impl form x nil nil)
-         (regex? x) (assoc x :type ::spec)
+         (regex? x) (spec-impl form x nil nil)
          :else (if (clojure.core/and (not (map? x)) (ifn? x))
                  (if-let [s (fn-sym x)]
                    (spec-impl s x nil nil)
@@ -261,16 +262,22 @@
 (defn- ->sym
   "Returns a symbol from a symbol or var"
   [x]
-  (if (var? x)
-    (let [m (meta x)]
-      (symbol (str (ns-name (:ns m))) (str (:name m))))
-    x))
-
+  (cond (var? x)
+        (let [m (meta x)]
+          (symbol (str (ns-name (:ns m))) (str (:name m))))
+        (fn? x) (fn-sym x)
+        :else x))
 ;; 314
 (defn- unfn [expr]
-  (if (clojure.core/and (seq? expr)
-                        (symbol? (first expr))
-                        (= "fn*" (name (first expr))))
+  (if (clojure.core/and
+       (seq? expr)
+       (let [fe (first expr)]
+         (clojure.core/and (symbol? fe)
+                           (let [n (name fe)]
+                             ;; TODO: should we force edamame to produce fn*
+                             ;; while parsing anon fns?
+                             (clojure.core/or (= "fn*" n)
+                                              (= "fn" n))))))
     (let [[[s] & form] (rest expr)]
       (conj (walk/postwalk-replace {s '%} form) '[%] 'fn))
     expr))
@@ -516,11 +523,13 @@
   Returns a regex op that matches (all) values in sequence, returning a map
   containing the keys of each pred and the corresponding value."
   [& key-pred-forms]
+  ;; (prn key-pred-forms) ;; ok
   (let [pairs (partition 2 key-pred-forms)
         keys (mapv first pairs)
         pred-forms (mapv second pairs)
         pf (mapv res pred-forms)]
     (clojure.core/assert (clojure.core/and (even? (count key-pred-forms)) (every? keyword? keys)) "cat expects k1 p1 k2 p2..., where ks are keywords")
+    ;; (prn "pf" pf) ;; too soon
     `(cat-impl ~keys ~pred-forms '~pf)))
 
 ;; 660
@@ -594,7 +603,12 @@
    (not (invalid? (dt pred x form)))))
 
 ;; 788
-;; explain-1: TODO
+(defn- explain-1 [form pred path via in v]
+  ;;(prn {:form form :pred pred :path path :in in :v v})
+  (let [pred (maybe-spec pred)]
+    (if (spec? pred)
+      (explain* pred path (if-let [name (spec-name pred)] (conj via name) via) in v)
+      [{:path path :pred form :val v :via via :in in}])))
 
 ;; 842
 (defn map-spec-impl
@@ -626,12 +640,14 @@
 (defn spec-impl
   ([form pred gfn cpred?] (spec-impl form pred gfn cpred? nil))
   ([form pred gfn cpred? unc]
-   {:type ::spec
-    :form form
-    :pred pred
-    :explain (fn [_ path via in x]
-               (when (invalid? (dt pred x form cpred?))
-                 [{:path path :pred form :val x :via via :in in}]))}))
+   (if (regex? pred)
+     (regex-spec-impl pred gfn)
+     {:type ::spec
+      :form form
+      :pred pred
+      :explain (fn [_ path via in x]
+                 (when (invalid? (dt pred x form cpred?))
+                   [{:path path :pred form :val x :via via :in in}]))})))
 
 ;; 998
 (defn ^:skip-wiki tuple-impl
@@ -664,7 +680,7 @@
 (defn or-spec-impl
   [keys forms preds]
   (let [id (java.util.UUID/randomUUID)
-        kps (zipmap keys preds)
+        ;; kps (zipmap keys preds)
         specs (delay (mapv specize preds forms))
         cform (case (count preds)
                 2 (fn [x]
@@ -701,7 +717,14 @@
                         ::invalid)))))]
     {:type ::spec
      :id id
-     :cform (fn [_ x] (cform x))}))
+     :cform (fn [_ x] (cform x))
+     :explain (fn [this path via in x]
+                (when-not (pvalid? this x)
+                  (apply concat
+                         (map (fn [k form pred]
+                                (when-not (pvalid? pred x)
+                                  (explain-1 form pred (conj path k) via in x)))
+                              keys forms preds))))}))
 
 ;; 1130
 (defn- and-preds [x preds forms]
@@ -715,6 +738,18 @@
           ;;propagate conformed values
           (recur nret preds forms)))
       ret)))
+
+;; 1142
+(defn- explain-pred-list
+  [forms preds path via in x]
+  (loop [ret x
+         [form & forms] forms
+         [pred & preds] preds]
+    (when pred
+      (let [nret (dt pred ret form)]
+        (if (invalid? nret)
+          (explain-1 form pred path via in ret)
+          (recur nret forms preds))))))
 
 ;; 1153
 (defn ^:skip-wiki and-spec-impl
@@ -749,13 +784,14 @@
                           (recur nret (inc i))))
                       ret)))))]
     {:type ::spec
-     :cform (fn [_ x] (cform x))}))
+     :cform (fn [_ x] (cform x))
+     :explain (fn [_ path via in x] (explain-pred-list forms preds path via in x))}))
 
 ;; 1197
 ;; merge-spec-impl: TODO
 
 ;; 1245
-(clojure.core/def ^:private empty-coll {`vector? [], `set? #{}, `list? (), `map? {}})
+(def ^:private empty-coll {`vector? [], `set? #{}, `list? (), `map? {}})
 
 ;; 1247
 (defn every-impl
@@ -1012,6 +1048,79 @@
         ::rep (alt2 (rep* (deriv p1 x) p2 ret splice forms)
                     (when (accept-nil? p1) (deriv (rep* p2 p2 (add-ret p1 ret nil) splice forms) x)))))))
 
+;; 1548
+(defn- op-describe [p]
+  (let [{:keys [::op ps ks forms splice p1 rep+ maybe amp] :as p} (reg-resolve! p)]
+    ;;(prn {:op op :ks ks :forms forms :p p})
+    (when p
+      (case op
+        ::accept nil
+        nil p
+        ::amp (list* 'clojure.spec.alpha/& amp forms)
+        ::pcat (if rep+
+                 (list `+ rep+)
+                 (cons `cat (mapcat vector (clojure.core/or (seq ks) (repeat :_)) forms)))
+        ::alt (if maybe
+                (list `? maybe)
+                (cons `alt (mapcat vector ks forms)))
+        ::rep (list (if splice `+ `*) forms)))))
+
+;; 1564
+(defn- op-explain [form p path via in input]
+  ;;(prn {:form form :p p :path path :input input})
+  (let [[x :as input] input
+        {:keys [::op ps ks forms splice p1 p2] :as p} (reg-resolve! p)
+        via (if-let [name (spec-name p)] (conj via name) via)
+        insufficient (fn [path form]
+                       [{:path path
+                         :reason "Insufficient input"
+                         :pred form
+                         :val ()
+                         :via via
+                         :in in}])]
+    (when p
+      (case op
+            ::accept nil
+            nil (if (empty? input)
+                  (insufficient path form)
+                  (explain-1 form p path via in x))
+            ::amp (if (empty? input)
+                    (if (accept-nil? p1)
+                      (explain-pred-list forms ps path via in (preturn p1))
+                      (insufficient path (:amp p)))
+                    (if-let [p1 (deriv p1 x)]
+                      (explain-pred-list forms ps path via in (preturn p1))
+                      (op-explain (:amp p) p1 path via in input)))
+            ::pcat (let [pkfs (map vector
+                                   ps
+                                   (clojure.core/or (seq ks) (repeat nil))
+                                   (clojure.core/or (seq forms) (repeat nil)))
+                         [pred k form] (if (= 1 (count pkfs))
+                                         (first pkfs)
+                                         (first (remove (fn [[p]] (accept-nil? p)) pkfs)))
+                         path (if k (conj path k) path)
+                         form (clojure.core/or form (op-describe pred))]
+                     (if (clojure.core/and (empty? input) (not pred))
+                       (insufficient path form)
+                       (op-explain form pred path via in input)))
+            ::alt (if (empty? input)
+                    (insufficient path (op-describe p))
+                    (apply concat
+                           (map (fn [k form pred]
+                                  (op-explain (clojure.core/or form (op-describe pred))
+                                              pred
+                                              (if k (conj path k) path)
+                                              via
+                                              in
+                                              input))
+                                (clojure.core/or (seq ks) (repeat nil))
+                                (clojure.core/or (seq forms) (repeat nil))
+                                ps)))
+            ::rep (op-explain (if (identical? p1 p2)
+                                forms
+                                (op-describe p1))
+                              p1 path via in input)))))
+
 ;; 1660
 (defn- re-conform [p [x & xs :as data]]
   ;;(prn {:p p :x x :xs xs})
@@ -1025,6 +1134,48 @@
     (if-let [dp (deriv p x)]
       (recur dp xs)
       ::invalid)))
+
+;; 1673
+(defn- re-explain [path via in re input]
+  (loop [p re [x & xs :as data] input i 0]
+    ;;(prn {:p p :x x :xs xs :re re}) (prn)
+    (if (empty? data)
+      (if (accept-nil? p)
+        nil ;;success
+        (op-explain (op-describe p) p path via in nil))
+      (if-let [dp (deriv p x)]
+        (recur dp xs (inc i))
+        (if (accept? p)
+          (if (= (::op p) ::pcat)
+            (op-explain (op-describe p) p path via (conj in i) (seq data))
+            [{:path path
+              :reason "Extra input"
+              :pred (op-describe re)
+              :val data
+              :via via
+              :in (conj in i)}])
+          (clojure.core/or (op-explain (op-describe p) p path via (conj in i) (seq data))
+                [{:path path
+                  :reason "Extra input"
+                  :pred (op-describe p)
+                  :val data
+                  :via via
+                  :in (conj in i)}]))))))
+
+;; 1699
+(defn regex-spec-impl
+  "Do not call this directly, use 'spec' with a regex op argument"
+  [re gfn]
+  (assoc re
+         :type ::spec
+         :cform (fn [_ x]
+                  (if (clojure.core/or (nil? x) (sequential? x))
+                    (re-conform re (seq x))
+                    ::invalid))
+         :explain (fn [_ path via in x]
+                    (if (clojure.core/or (nil? x) (sequential? x))
+                      (re-explain path via in re (seq x))
+                      [{:path path :pred (res `#(clojure.core/or (nil? %) (sequential? %))) :val x :via via :in in}]))))
 
 ;; 1836
 (defn nilable-impl
