@@ -20,6 +20,10 @@
   "The number of elements validated in a collection spec'ed with 'every'"
   101)
 
+(def ^:dynamic *coll-error-limit*
+  "The number of errors reported by explain in a collection spec'ed with 'every'"
+  20)
+
 ;; 52
 (defonce ^:private registry-ref (atom {}))
 
@@ -188,7 +192,14 @@
 
 (defn explain* [spec path via in x]
   (let [{explain-f :explain} spec]
-    (explain-f spec path via in x)))
+    (if explain-f
+      (explain-f spec path via in x)
+      (throw (ex-info "No explain function implemented yet."
+                      {:spec spec
+                       :path path
+                       :via via
+                       :in :in
+                       :x x})))))
 
 ;; 218:
 (defn explain-data* [spec path via in x]
@@ -686,7 +697,22 @@
                            (if (invalid? cv)
                              ::invalid
                              (recur (if (identical? cv v) ret (assoc ret i cv))
-                                    (inc i)))))))))})))
+                                    (inc i)))))))))
+        :explain (fn [_ path via in x]
+                   (cond
+                     (not (vector? x))
+                     [{:path path :pred `vector? :val x :via via :in in}]
+
+                     (not= (count x) (count preds))
+                     [{:path path :pred `(= (count ~'%) ~(count preds)) :val x :via via :in in}]
+
+                     :else
+                     (apply concat
+                            (map (fn [i form pred]
+                                   (let [v (x i)]
+                                     (when-not (pvalid? pred v)
+                                       (explain-1 form pred (conj path i) via (conj in i) v))))
+                                 (range (count preds)) forms preds))))})))
 
 ;; 1060
 (defn- tagged-ret [tag ret]
@@ -806,6 +832,26 @@
 ;; 1197
 ;; merge-spec-impl: TODO
 
+;; 1255
+(defn- coll-prob [x kfn kform distinct count min-count max-count
+                  path via in]
+  (let [pred (clojure.core/or kfn coll?)
+        kform (clojure.core/or kform `coll?)]
+    (cond
+      (not (pvalid? pred x))
+      (explain-1 kform pred path via in x)
+
+      (clojure.core/and count (not= count (bounded-count count x)))
+      [{:path path :pred `(= ~count (c/count ~'%)) :val x :via via :in in}]
+
+      (clojure.core/and (clojure.core/or min-count max-count)
+             (not (<= (clojure.core/or min-count 0)
+                      (bounded-count (if max-count (inc max-count) min-count) x)
+                      (clojure.core/or max-count Integer/MAX_VALUE))))
+      [{:path path :pred `(<= ~(clojure.core/or min-count 0) (c/count ~'%) ~(clojure.core/or max-count 'Integer/MAX_VALUE)) :val x :via via :in in}]
+      (clojure.core/and distinct (seq x) (not (apply distinct? x)))
+      [{:path path :pred 'distinct? :val x :via via :in in}])))
+
 ;; 1245
 (def ^:private empty-coll {`vector? [], `set? #{}, `list? (), `map? {}})
 
@@ -877,7 +923,19 @@
                            (cond
                              (clojure.core/or (nil? vseq) (= i limit)) x
                              (valid? spec v) (recur (inc i) vs)
-                             :else ::invalid)))))))})))
+                             :else ::invalid)))))))
+        :explain (fn [_ path via in x]
+                   (clojure.core/or (coll-prob x kind kind-form distinct count min-count max-count
+                                               path via in)
+                                    (apply concat
+                                           ((if conform-all identity (partial take *coll-error-limit*))
+                                            (keep identity
+                                                  (map (fn [i v]
+                                                         (let [k (kfn i v)]
+                                                           (when-not (check? v)
+                                                             (let [prob (explain-1 form pred path via (conj in k) v)]
+                                                               prob))))
+                                                       (range) x))))))})))
 
 
 ;; 1382
@@ -1199,7 +1257,12 @@
   [form pred]
   (let [spec (delay (specize pred form))]
     {:type ::spec
-     :cform (fn [_ x] (if (nil? x) nil (conform* @spec x)))}))
+     :cform (fn [_ x] (if (nil? x) nil (conform* @spec x)))
+     :explain (fn [_ path via in x]
+                (when-not (clojure.core/or (pvalid? @spec x) (nil? x))
+                  (conj
+                   (explain-1 form pred (conj path ::pred) via in x)
+                   {:path (conj path ::nil) :pred 'nil? :val x :via via :in in})))}))
 
 ;; 1862
 (defmacro nilable
@@ -1242,10 +1305,10 @@ system property. Defaults to false."
   [spec x]
   (if (valid? spec x)
     x
-    (let [ed (clojure.core/merge (assoc {} #_(explain-data* spec [] [] [] x)
+    (let [ed (clojure.core/merge (assoc (explain-data* spec [] [] [] x)
                                         ::failure :assertion-failed))]
       (throw (ex-info
-              (str "Spec assertion failed\n" (with-out-str ed #_(explain-out ed)))
+              (str "Spec assertion failed\n" (with-out-str (explain-out ed)))
               ed)))))
 
 ;; 1977

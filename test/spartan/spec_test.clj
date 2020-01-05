@@ -68,28 +68,38 @@
 (deftest nilable-test
   (is (s/valid? (s/nilable int?) nil))
   (is (= {:i 1} (s/conform (s/cat :i (s/nilable int?)) [1])))
-  (is (= {:i nil} (s/conform (s/cat :i (s/nilable int?)) [nil]))))
+  (is (= {:i nil} (s/conform (s/cat :i (s/nilable int?)) [nil])))
+  (is (= (str/trim "
+:foo - failed: int? in: [0] at: [:i :spartan.spec/pred]
+:foo - failed: nil? in: [0] at: [:i :spartan.spec/nil]\n")
+         (str/trim (with-out-str (s/explain (s/cat :i (s/nilable int?)) [:foo]))))))
 
 (deftest every-test
   (is (= '[1 2 3] (s/conform (s/every int?) [1 2 3])))
-  (is (s/invalid? (s/conform (s/every int?) [1 2 "a"]))))
+  (is (s/invalid? (s/conform (s/every int?) [1 2 "a"])))
+  (is (= "\"a\" - failed: int? in: [2]\n" (with-out-str (s/explain (s/every int?) [1 2 "a"])))))
 
 (deftest every-kv-test
   (is (= '{:foo "foo" :bar "bar"}
          (s/conform (s/every-kv keyword? string?) {:foo "foo" :bar "bar"})))
-  (is (s/invalid? (s/conform (s/every-kv keyword? string?) {:foo 1 :bar "bar"}))))
+  (is (s/invalid? (s/conform (s/every-kv keyword? string?) {:foo 1 :bar "bar"})))
+  (is (= "1 - failed: string? in: [:foo 1] at: [1]\n"
+         (with-out-str (s/explain (s/every-kv keyword? string?) {:foo 1 :bar "bar"})))))
 
 (deftest coll-of-test
   (is (= '[1 2 3] (s/conform (s/coll-of int?) [1 2 3])))
-  (is (s/invalid? (s/conform (s/coll-of int?) [1 2 "a"]))))
+  (is (s/invalid? (s/conform (s/coll-of int?) [1 2 "a"])))
+  (is (= "\"a\" - failed: int? in: [2]\n" (with-out-str (s/explain (s/coll-of int?) [1 2 "a"])))))
 
 (deftest fn-literal-in-spec-test
   (s/def ::kws (s/and keyword? #(= (namespace %) "my.domain")))
-  (is (s/valid? ::kws :my.domain/name)))
+  (is (s/valid? ::kws :my.domain/name))
+  (is (= ":foo - failed: (= (namespace %) \"my.domain\") spec: :spartan.spec-test/kws\n"
+         (with-out-str (s/explain ::kws :foo)))))
 
 (deftest assert-test
   (s/check-asserts true)
-  (is (str/includes? (try (s/assert int? "foo")
-                          (catch clojure.lang.ExceptionInfo e
-                            (ex-message e)))
-                     "assertion failed")))
+  (is (re-find #"(?s)assertion failed.*int\?"
+               (try (s/assert int? "foo")
+                    (catch clojure.lang.ExceptionInfo e
+                      (ex-message e))))))
