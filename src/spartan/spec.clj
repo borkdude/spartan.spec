@@ -371,7 +371,6 @@
         keys-pred `(fn* [~gx] (clojure.core/and ~@pred-exprs))
         pred-exprs (mapv (fn [e] `(fn* [~gx] ~e)) pred-exprs)
         pred-forms (walk/postwalk res pred-exprs)]
-    ;; `(map-spec-impl ~req-keys '~req ~opt '~pred-forms ~pred-exprs ~gen)
     `(map-spec-impl {:req '~req :opt '~opt :req-un '~req-un :opt-un '~opt-un
                      :req-keys '~req-keys :req-specs '~req-specs
                      :opt-keys '~opt-keys :opt-specs '~opt-specs
@@ -634,7 +633,24 @@
                                       ks)))
                            (recur ret ks)))
                        ret)))
-                 ::invalid))}))
+                 ::invalid))
+     :explain (fn [_ path via in x]
+               (if-not (map? x)
+                 [{:path path :pred `map? :val x :via via :in in}]
+                 (let [reg (registry)]
+                   (apply concat
+                          (when-let [probs (->> (map (fn [pred form] (when-not (pred x) form))
+                                                     pred-exprs pred-forms)
+                                                (keep identity)
+                                                seq)]
+                            (map
+                             #(identity {:path path :pred % :val x :via via :in in})
+                             probs))
+                          (map (fn [[k v]]
+                                 (when-not (clojure.core/or (not (contains? reg (keys->specnames k)))
+                                                            (pvalid? (keys->specnames k) v k))
+                                   (explain-1 (keys->specnames k) (keys->specnames k) (conj path k) via (conj in k) v)))
+                               (seq x))))))}))
 
 ;; 915
 (defn spec-impl

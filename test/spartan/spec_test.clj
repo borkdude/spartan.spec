@@ -46,15 +46,24 @@
 
 (deftest +-test
   (is (= {:j [1]} (s/conform (s/cat :j (s/+ number?)) [1])))
-  (is (s/invalid? (s/conform (s/cat :j (s/+ number?)) []))))
+  (is (s/invalid? (s/conform (s/cat :j (s/+ number?)) [])))
+  (is (= "Success!\n"
+         (with-out-str (s/explain (s/cat :j (s/+ number?)) [1]))))
+  (is (= "() - failed: Insufficient input at: [:j]\n"
+         (with-out-str (s/explain (s/cat :j (s/+ number?)) [])))))
 
 (deftest def-test
-  (is (true? (do (s/def ::int int?) (s/valid? ::int 1)))))
+  (is (true? (do (s/def ::int int?) (s/valid? ::int 1))))
+  (is (= "\"foo\" - failed: int? spec: :spartan.spec-test/int\n" (with-out-str (s/explain ::int "foo")))))
 
 (deftest keys-test
   (s/def ::a (s/keys :req-un [::b ::c]))
   (s/def ::b (s/cat :i int? :j int?))
-  (is (= {:c 2, :b {:i 1, :j 2}} (s/conform ::a {:b [1 2] :c 2}))))
+  (is (= {:c 2, :b {:i 1, :j 2}} (s/conform ::a {:b [1 2] :c 2})))
+  (is (= (str/trim "
+1 - failed: :spartan.spec-test/b in: [:b] at: [:b] spec: :spartan.spec-test/a
+{:b 1} - failed: (contains? % :c) spec: :spartan.spec-test/a\n")
+         (str/trim (with-out-str (s/explain ::a {:b 1}))))))
 
 (deftest nilable-test
   (is (s/valid? (s/nilable int?) nil))
