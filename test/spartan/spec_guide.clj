@@ -4,7 +4,7 @@
 (s/conform even? 1000)
 (s/valid? even? 10)
 
-(s/def ::date #(instance? java.util.Date %)) ;; TODO: add inst? to sci
+(s/def ::date inst?)
 (s/def ::suit #{:club :diamond :heart :spade})
 
 (s/valid? ::date (java.util.Date.))
@@ -102,10 +102,9 @@
 (s/def ::port number?)
 (s/def ::host string?)
 (s/def ::id keyword?)
-(s/def ::server (constantly true)
-  ;; TODO:
-  #_(s/keys* :req [::id ::host] :opt [::port]))
-(s/conform ::server [::id :s1 ::host "example.com" ::port 5555])
+(s/def ::server
+  (s/keys* :req [::id ::host] :opt [::port]))
+(prn ">" (s/conform ::server [::id :s1 ::host "example.com" ::port 5555]))
 ;;=> {:my.domain/id :s1, :my.domain/host "example.com", :my.domain/port 5555}
 
 (s/def :animal/kind string?)

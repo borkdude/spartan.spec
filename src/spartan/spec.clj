@@ -153,9 +153,9 @@
         (:cform spec)
         ((:cform spec) spec x)
         :else
-        (let [pred (:pred spec)
-              ret (pred x)]
-          (if ret x ::invalid))))
+        (throw (ex-info "No conform function implemented yet."
+                        {:spec spec
+                         :x x}))))
 
 ;; 167
 (defn conform
@@ -673,7 +673,10 @@
      (regex-spec-impl pred gfn)
      {:type ::spec
       :form form
-      :pred pred
+      :cform (fn [_ x] (let [ret (pred x)]
+                         (if cpred?
+                           ret
+                           (if ret x ::invalid))))
       :explain (fn [_ path via in x]
                  (when (invalid? (dt pred x form cpred?))
                    [{:path path :pred form :val x :via via :in in}]))})))
@@ -1252,6 +1255,26 @@
                     (if (clojure.core/or (nil? x) (sequential? x))
                       (re-explain path via in re (seq x))
                       [{:path path :pred (res `#(clojure.core/or (nil? %) (sequential? %))) :val x :via via :in in}]))))
+
+;; 1794
+(spartan.spec/def ::kvs->map (conformer #(zipmap (map ::k %) (map ::v %)) #(map (fn [[k v]] {::k k ::v v}) %)))
+
+;; 1796
+(defmacro keys*
+  "takes the same arguments as spec/keys and returns a regex op that matches sequences of key/values,
+  converts them into a map, and conforms that map with a corresponding
+  spec/keys call:
+  user=> (s/conform (s/keys :req-un [::a ::c]) {:a 1 :c 2})
+  {:a 1, :c 2}
+  user=> (s/conform (s/keys* :req-un [::a ::c]) [:a 1 :c 2])
+  {:a 1, :c 2}
+  the resulting regex op can be composed into a larger regex:
+  user=> (s/conform (s/cat :i1 integer? :m (s/keys* :req-un [::a ::c]) :i2 integer?) [42 :a 1 :c 2 :d 4 99])
+  {:i1 42, :m {:a 1, :c 2, :d 4}, :i2 99}"
+  [& kspecs]
+  `(let [mspec# (spartan.spec/keys ~@kspecs)]
+     ;; NOTE: deleted with/gen
+     (spartan.spec/& (spartan.spec/* (spartan.spec/cat ::k keyword? ::v any?)) ::kvs->map mspec#)))
 
 ;; 1836
 (defn nilable-impl

@@ -61,9 +61,13 @@
   (s/def ::b (s/cat :i int? :j int?))
   (is (= {:c 2, :b {:i 1, :j 2}} (s/conform ::a {:b [1 2] :c 2})))
   (is (= (str/trim "
-1 - failed: :spartan.spec-test/b in: [:b] at: [:b] spec: :spartan.spec-test/a
-{:b 1} - failed: (contains? % :c) spec: :spartan.spec-test/a\n")
+1 - failed: (or (nil? %) (sequential? %)) in: [:b] at: [:b] spec: :spartan.spec-test/b
+{:b 1} - failed: (contains? % :c) spec: :spartan.spec-test/a")
          (str/trim (with-out-str (s/explain ::a {:b 1}))))))
+
+(deftest keys*-test
+  (s/def ::a* (s/keys* :req-un [::a*1 ::a*2]))
+  (is (= {:a*1 1, :a*2 2} (s/conform ::a* [:a*1 1 :a*2 2]))))
 
 (deftest nilable-test
   (is (s/valid? (s/nilable int?) nil))
