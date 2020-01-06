@@ -8,7 +8,8 @@
   (is (= 1 (s/conform int? 1)))
   (is (s/invalid? (s/conform string? 1)))
   (is (= "--opts" (s/conform #{"--opts"} "--opts")))
-  (is (= "\"foo\" - failed: int?\n" (with-out-str (s/explain int? "foo")))))
+  (is (= "\"foo\" - failed: int?\n" (with-out-str (s/explain int? "foo"))))
+  (is (= 'int? (s/describe int?))))
 
 (deftest cat-test
   (is (= {:a 1, :b "foo"} (s/conform (s/cat :a int? :b string?) [1 "foo"])))

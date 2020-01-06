@@ -165,8 +165,18 @@
 ;; 173
 ;; unform: TODO
 
+(defn describe* [spec]
+  (if-let [d (:describe spec)]
+    (d spec)
+    (throw (ex-info "No describe function implemented yet."
+                    {:spec spec}))))
+
 ;; 180
-;; form: TODO
+(defn form
+  "returns the spec as data"
+  [spec]
+  ;;TODO - incorporate gens
+  (describe* (specize spec)))
 
 ;; 186
 (defn abbrev [form]
@@ -187,7 +197,10 @@
     :else form))
 
 ;; 205:
-;; describe: TODO
+(defn describe
+  "returns an abbreviated description of the spec as data"
+  [spec]
+  (abbrev (form spec)))
 
 ;; 210:
 ;; with-gen: TODO
@@ -679,7 +692,8 @@
                            (if ret x ::invalid))))
       :explain (fn [_ path via in x]
                  (when (invalid? (dt pred x form cpred?))
-                   [{:path path :pred form :val x :via via :in in}]))})))
+                   [{:path path :pred form :val x :via via :in in}]))
+      :describe (fn [_] form)})))
 
 ;; 998
 (defn ^:skip-wiki tuple-impl
