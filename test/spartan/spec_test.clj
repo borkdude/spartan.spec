@@ -14,19 +14,22 @@
 (deftest cat-test
   (is (= {:a 1, :b "foo"} (s/conform (s/cat :a int? :b string?) [1 "foo"])))
   (is (s/invalid? (s/conform (s/cat :a int? :b string?) [1 "foo" "bar"])))
-  (is (= "1 - failed: string? in: [0] at: [:i]\n" (with-out-str (s/explain (s/cat :i string?) [1])))))
+  (is (= "1 - failed: string? in: [0] at: [:i]\n" (with-out-str (s/explain (s/cat :i string?) [1]))))
+  (is (= '(cat :a int? :b string?) (s/describe (s/cat :a int? :b string?)))))
 
 (deftest alt-test
   (is (= [:a 1] (s/conform (s/alt :a int? :b string?) [1])))
   (is (s/invalid? (s/conform (s/alt :a int? :b string?) 1)))
   (is (= "1 - failed: (or (nil? %) (sequential? %))\n"
-         (with-out-str (s/explain (s/alt :a int? :b string?) 1)))))
+         (with-out-str (s/explain (s/alt :a int? :b string?) 1))))
+  (is (= '(alt :a int? :b string?) (s/describe (s/alt :a int? :b string?)))))
 
 (deftest and-test
   (is (= 6 (s/conform (s/and number? #(> % 5)) 6)))
   (is (s/invalid? (s/conform (s/and number? #(> % 5)) 5)))
   (is (= "5 - failed: (> % 5)\n"
-         (with-out-str (s/explain (s/and number? #(> % 5)) 5)))))
+         (with-out-str (s/explain (s/and number? #(> % 5)) 5))))
+  (is (= '(and number? (> % 5)) (s/describe (s/and number? #(> % 5))))))
 
 (deftest or-test
   (is (= [:a 1] (s/conform (s/or :a int? :b string?) 1)))

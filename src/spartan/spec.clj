@@ -846,7 +846,8 @@
                       ret)))))]
     {:type ::spec
      :cform (fn [_ x] (cform x))
-     :explain (fn [_ path via in x] (explain-pred-list forms preds path via in x))}))
+     :explain (fn [_ path via in x] (explain-pred-list forms preds path via in x))
+     :describe (fn [_] `(and ~@forms))}))
 
 ;; 1197
 (defn ^:skip-wiki merge-spec-impl
@@ -1279,7 +1280,8 @@
          :explain (fn [_ path via in x]
                     (if (clojure.core/or (nil? x) (sequential? x))
                       (re-explain path via in re (seq x))
-                      [{:path path :pred (res `#(clojure.core/or (nil? %) (sequential? %))) :val x :via via :in in}]))))
+                      [{:path path :pred (res `#(clojure.core/or (nil? %) (sequential? %))) :val x :via via :in in}]))
+         :describe (fn [_] (op-describe re))))
 
 ;; 1794
 (spartan.spec/def ::kvs->map (conformer #(zipmap (map ::k %) (map ::v %)) #(map (fn [[k v]] {::k k ::v v}) %)))
