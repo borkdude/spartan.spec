@@ -35,18 +35,21 @@
   (is (= [:a 1] (s/conform (s/or :a int? :b string?) 1)))
   (is (s/invalid? (s/conform (s/or :a int? :b string?) {:a 1})))
   (is (= "{:a 1} - failed: int? at: [:a]\n{:a 1} - failed: string? at: [:b]\n"
-         (with-out-str (s/explain (s/or :a int? :b string?) {:a 1})))))
+         (with-out-str (s/explain (s/or :a int? :b string?) {:a 1}))))
+  (is (= '(or :a int? :b string?) (s/describe (s/or :a int? :b string?)))))
 
 (deftest *-test
   (is (= {:i [1 2 3]} (s/conform (s/cat :i (s/* number?)) [1 2 3])))
   (is (s/invalid? (s/conform (s/cat :i (s/* number?)) [1 2 3 "foo"])))
   (is (s/invalid? (s/conform (s/cat :i (s/* number?)) 1)))
   (is (= "\"foo\" - failed: number? in: [3] at: [:i]\n"
-         (with-out-str (s/explain (s/cat :i (s/* number?)) [1 2 3 "foo"])))))
+         (with-out-str (s/explain (s/cat :i (s/* number?)) [1 2 3 "foo"]))))
+  (is (= '(* number?) (s/describe (s/* number?)))))
 
 (deftest ?-test
   (is (= {:i 1 :j 2} (s/conform (s/cat :i number? :j (s/? number?)) [1 2])))
-  (is (= {:i 1} (s/conform (s/cat :i number? :j (s/? number?)) [1]))))
+  (is (= {:i 1} (s/conform (s/cat :i number? :j (s/? number?)) [1])))
+  (is (= '(? number?) (s/describe (s/? number?)))))
 
 (deftest +-test
   (is (= {:j [1]} (s/conform (s/cat :j (s/+ number?)) [1])))
@@ -54,7 +57,8 @@
   (is (= "Success!\n"
          (with-out-str (s/explain (s/cat :j (s/+ number?)) [1]))))
   (is (= "() - failed: Insufficient input at: [:j]\n"
-         (with-out-str (s/explain (s/cat :j (s/+ number?)) [])))))
+         (with-out-str (s/explain (s/cat :j (s/+ number?)) []))))
+  (is (= '(+ number?) (s/describe (s/+ number?)))))
 
 (deftest def-test
   (is (true? (do (s/def ::int int?) (s/valid? ::int 1))))

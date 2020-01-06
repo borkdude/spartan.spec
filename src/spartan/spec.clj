@@ -785,7 +785,8 @@
                          (map (fn [k form pred]
                                 (when-not (pvalid? pred x)
                                   (explain-1 form pred (conj path k) via in x)))
-                              keys forms preds))))}))
+                              keys forms preds))))
+     :describe (fn [_] `(or ~@(mapcat vector keys forms)))}))
 
 ;; 1130
 (defn- and-preds [x preds forms]
