@@ -835,7 +835,18 @@
      :explain (fn [_ path via in x] (explain-pred-list forms preds path via in x))}))
 
 ;; 1197
-;; merge-spec-impl: TODO
+(defn ^:skip-wiki merge-spec-impl
+  "Do not call this directly, use 'merge'"
+  [forms preds gfn]
+  {:type ::spec
+   :cform (fn [_ x] (let [ms (map #(dt %1 x %2) preds forms)]
+                      (if (some invalid? ms)
+                        ::invalid
+                        (apply clojure.core/merge ms))))
+   :explain (fn [_ path via in x]
+              (apply concat
+                     (map #(explain-1 %1 %2 path via in x)
+                          forms preds)))})
 
 ;; 1255
 (defn- coll-prob [x kfn kform distinct count min-count max-count

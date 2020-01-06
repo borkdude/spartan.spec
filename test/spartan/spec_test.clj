@@ -65,6 +65,16 @@
 {:b 1} - failed: (contains? % :c) spec: :spartan.spec-test/a")
          (str/trim (with-out-str (s/explain ::a {:b 1}))))))
 
+(deftest merge-test
+  (s/def ::a (s/keys :req-un [::a1 ::a2]))
+  (s/def ::b (s/keys :req-un [::b1 ::b2]))
+  (s/def ::ab (s/merge ::a ::b))
+  (is (= (str/trim "
+{:a1 1, :b1 2} - failed: (contains? % :a2) spec: :spartan.spec-test/a
+{:a1 1, :b1 2} - failed: (contains? % :b2) spec: :spartan.spec-test/b
+")
+         (str/trim (with-out-str (s/explain ::ab {:a1 1 :b1 2}))))))
+
 (deftest keys*-test
   (s/def ::a* (s/keys* :req-un [::a*1 ::a*2]))
   (is (= {:a*1 1, :a*2 2} (s/conform ::a* [:a*1 1 :a*2 2]))))
