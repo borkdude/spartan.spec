@@ -676,7 +676,13 @@
                                  (when-not (clojure.core/or (not (contains? reg (keys->specnames k)))
                                                             (pvalid? (keys->specnames k) v k))
                                    (explain-1 (keys->specnames k) (keys->specnames k) (conj path k) via (conj in k) v)))
-                               (seq x))))))}))
+                               (seq x))))))
+     :describe (fn [_] (cons `keys
+                             (cond-> []
+                               req (conj :req req)
+                               opt (conj :opt opt)
+                               req-un (conj :req-un req-un)
+                               opt-un (conj :opt-un opt-un))))}))
 
 ;; 915
 (defn spec-impl
@@ -862,7 +868,8 @@
    :explain (fn [_ path via in x]
               (apply concat
                      (map #(explain-1 %1 %2 path via in x)
-                          forms preds)))})
+                          forms preds)))
+   :describe (fn [_] `(merge ~@forms))})
 
 ;; 1255
 (defn- coll-prob [x kfn kform distinct count min-count max-count
@@ -967,7 +974,8 @@
                                                            (when-not (check? v)
                                                              (let [prob (explain-1 form pred path via (conj in k) v)]
                                                                prob))))
-                                                       (range) x))))))})))
+                                                       (range) x))))))
+        :describe (fn [_] (clojure.core/or describe-form `(every ~(res form) ~@(mapcat identity opts))))})))
 
 
 ;; 1382
@@ -1315,7 +1323,8 @@
                 (when-not (clojure.core/or (pvalid? @spec x) (nil? x))
                   (conj
                    (explain-1 form pred (conj path ::pred) via in x)
-                   {:path (conj path ::nil) :pred 'nil? :val x :via via :in in})))}))
+                   {:path (conj path ::nil) :pred 'nil? :val x :via via :in in})))
+     :describe (fn [_] `(nilable ~(res form)))}))
 
 ;; 1862
 (defmacro nilable
