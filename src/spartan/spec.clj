@@ -1123,23 +1123,14 @@
   (let [{:keys [::op ps splice] :as p} (reg-resolve! p)
         prop #(let [ret (preturn p)]
                 (if (empty? ret) r ((if splice into conj) r (if k {k ret} ret))))]
-    ;; TODO: revert when sci has support for lists in case
-    #_(case op
+    (case op
         nil r
         (::alt ::accept ::amp)
         (let [ret (preturn p)]
           ;;(prn {:ret ret})
           (if (= ret ::nil) r (conj r (if k {k ret} ret))))
 
-        (::rep ::pcat) (prop))
-    (cond ;; op
-      (nil? op) r
-      (contains? #{::alt ::accept ::amp} op)
-      (let [ret (preturn p)]
-        ;;(prn {:ret ret})
-        (if (= ret ::nil) r (conj r (if k {k ret} ret))))
-      (contains? #{::rep ::pcat} op) (prop)
-      :else (throw (Exception. (str "No matching case: " op))))))
+        (::rep ::pcat) (prop))))
 
 ;; 1528
 (defn- deriv
