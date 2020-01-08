@@ -112,7 +112,7 @@
 
 ;; 131
 (defn- fn-sym [^Object f]
-  (let [[_ f-ns f-n] (re-matches #"(.*)\$(.*?)(__[0-9]+)?" (-> f .getClass .getName) #_(.. f getClass getName))]
+  (let [[_ f-ns f-n] (re-matches #"(.*)\$(.*?)(__[0-9]+)?" (.. f getClass getName))]
     ;; check for anonymous function
     (when (not= "fn" f-n)
       (symbol (demunge f-ns) (demunge f-n) #_(clojure.lang.Compiler/demunge f-ns) #_(clojure.lang.Compiler/demunge f-n)))))

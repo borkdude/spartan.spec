@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 
 deps.clj -A:test -Scommand 'bb -cp {{classpath}} {{main-opts}}'
-# deps.clj -A:test -Scommand 'bb --verbose -cp {{classpath}}' -e "(require '[spartan.spec-guide :as g])"
+deps.clj -A:test -Scommand 'clojure -A:bb-local -cp {{classpath}} {{main-opts}}'
+
