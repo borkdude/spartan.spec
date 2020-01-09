@@ -30,6 +30,7 @@ Usage in a `deps.edn` project:
 
 ``` shell
 $ bb -cp "$(clojure -Spath)" -e "(require '[spartan.spec :as s]) (s/valid? int? :foo)"
+false
 ```
 
 ## Tests
