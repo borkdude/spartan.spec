@@ -12,7 +12,7 @@ A spartan implementation of clojure.spec.alpha compatible with
 Currently babashka doesn't have a built-in implementation of
 `clojure.spec.alpha`. This library can be used meanwhile. If the application of
 spec in scripting turns out to be useful, babashka will probably bundle a
-built-in implementation of spec2 at some point which will probably also be more performant.
+built-in implementation of spec2 at some point which will be more performant than the interpreted version.
 
 ## Differences with clojure.spec.alpha
 
