@@ -12,11 +12,13 @@
 
 (ns spartan.spec
   (:refer-clojure :exclude [+ * and assert or cat def keys merge])
-  (:require [clojure.walk :as walk]
-            [clojure.main :refer [demunge]]))
+  (:require #?(:joker [joker.walk :as walk]
+               :default [clojure.walk :as walk])
+            #?(:bb [clojure.main :refer [demunge]]
+               :clojure [clojure.main :refer [demunge]])))
 
 ;; 22
-(alias 'c 'clojure.core)
+(alias 'c #?(:joker 'joker.core :default 'clojure.core))
 
 ;; 36
 (def ^:dynamic *coll-check-limit*
@@ -55,7 +57,8 @@
   [k]
   (if (ident? k)
     (c/or (reg-resolve k)
-                     (throw (Exception. (str "Unable to resolve spec: " k))))
+          #?(:bb (throw (Exception. (str "Unable to resolve spec: " k)))
+             :clj (throw (Exception. (str "Unable to resolve spec: " k)))))
     k))
 
 ;; 79
@@ -75,7 +78,9 @@
   (cond
     (ident? spec) spec
     (regex? spec) (assoc spec ::name name)
-    (instance? clojure.lang.IObj spec)
+    #?(:bb (instance? clojure.lang.IObj spec)
+       :joker (coll? spec)
+       :default (instance? clojure.lang.IObj spec))
     (with-meta spec (assoc (meta spec) ::name name))
     :else spec))
 
@@ -84,7 +89,9 @@
   (cond
     (ident? spec) spec
     (regex? spec) (::name spec)
-    (instance? clojure.lang.IObj spec)
+    #?(:bb (instance? clojure.lang.IObj spec)
+       :joker (coll? spec)
+       :default (instance? clojure.lang.IObj spec))
     (-> (meta spec) ::name)))
 
 ;; 107
@@ -111,14 +118,17 @@
   (c/or
    (maybe-spec spec-or-k)
    (when (ident? spec-or-k)
-     (throw (Exception. (str "Unable to resolve spec: " spec-or-k))))))
+     #?(:bb (throw (Exception. (str "Unable to resolve spec: " spec-or-k)))
+        :clj (throw (Exception. (str "Unable to resolve spec: " spec-or-k)))))))
 
 ;; 131
 (defn- fn-sym [^Object f]
-  (let [[_ f-ns f-n] (re-matches #"(.*)\$(.*?)(__[0-9]+)?" (.. f getClass getName))]
-    ;; check for anonymous function
-    (when (not= "fn" f-n)
-      (symbol (demunge f-ns) (demunge f-n) #_(clojure.lang.Compiler/demunge f-ns) #_(clojure.lang.Compiler/demunge f-n)))))
+  #?(:joker nil
+     :default
+     (let [[_ f-ns f-n] (re-matches #"(.*)\$(.*?)(__[0-9]+)?" (.. f getClass getName))]
+       ;; check for anonymous function
+       (when (not= "fn" f-n)
+         (symbol (demunge f-ns) (demunge f-n) #_(clojure.lang.Compiler/demunge f-ns) #_(clojure.lang.Compiler/demunge f-n))))))
 
 (defn specize*
   ([x] (specize* x nil))
@@ -127,7 +137,8 @@
          (symbol? x) (reg-resolve! x)
          (set? x) (spec-impl form x nil nil)
          (regex? x) (spec-impl form x nil nil)
-         :else (if (c/and (not (map? x)) (ifn? x))
+         :else (if (c/and (not (map? x)) #?(:joker (fn? x)
+                                            :default (ifn? x)))
                  (if-let [s (fn-sym x)]
                    (spec-impl s x nil nil)
                    (spec-impl ::unknown x nil nil))
@@ -323,6 +334,7 @@
 (defn def-impl
   "Do not call this directly, use 'def'"
   [k form spec]
+  (prn ">" k form spec)
   (c/assert (c/and (ident? k) (namespace k)) "k must be namespaced keyword or resolvable symbol")
   (if (nil? spec)
     (swap! registry-ref dissoc k)
@@ -348,7 +360,8 @@
   registry mapping k to the spec. Use nil to remove an entry in
   the registry for k."
   [k spec-form]
-  (let [k (if (symbol? k) (throw (Exception. "Only keywords allowed for now"))
+  (let [k (if (symbol? k) #?(:bb (throw (Exception. "Only keywords allowed for now"))
+                             :clj (throw (Exception. "Only keywords allowed for now")))
               #_(ns-qualify k) k)]
     `(def-impl '~k '~(res spec-form) ~spec-form)))
 
@@ -609,7 +622,8 @@
          (if cpred?
            (pred x)
            (if (pred x) x ::invalid))
-         (throw (Exception. (str (pr-str form) " is not a fn, expected predicate fn")))))
+         #?(:bb (throw (Exception. (str (pr-str form) " is not a fn, expected predicate fn")))
+            :clj (throw (Exception. (str (pr-str form) " is not a fn, expected predicate fn"))))))
      x)))
 
 ;; 772
