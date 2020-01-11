@@ -15,6 +15,9 @@
   (:require [clojure.walk :as walk]
             [clojure.main :refer [demunge]]))
 
+;; 22
+(alias 'c 'clojure.core)
+
 ;; 36
 (def ^:dynamic *coll-check-limit*
   "The number of elements validated in a collection spec'ed with 'every'"
@@ -51,7 +54,7 @@
   "returns the spec/regex at end of alias chain starting with k, throws if not found, k if k not ident"
   [k]
   (if (ident? k)
-    (clojure.core/or (reg-resolve k)
+    (c/or (reg-resolve k)
                      (throw (Exception. (str "Unable to resolve spec: " k))))
     k))
 
@@ -65,7 +68,7 @@
 ;; 85
 (defn regex?
   [x]
-  (clojure.core/and (::op x) x))
+  (c/and (::op x) x))
 
 ;; 90
 (defn- with-name [spec name]
@@ -93,7 +96,7 @@
 (defn- maybe-spec
   "spec-or-k must be a spec, regex or resolvable kw/sym, else returns nil."
   [spec-or-k]
-  (let [s (clojure.core/or (clojure.core/and (ident? spec-or-k) (reg-resolve spec-or-k))
+  (let [s (c/or (c/and (ident? spec-or-k) (reg-resolve spec-or-k))
                            (spec? spec-or-k)
                            (regex? spec-or-k)
                            nil)]
@@ -105,7 +108,7 @@
 (defn- the-spec
   "spec-or-k must be a spec, regex or kw/sym, else returns nil. Throws if unresolvable kw/sym"
   [spec-or-k]
-  (clojure.core/or
+  (c/or
    (maybe-spec spec-or-k)
    (when (ident? spec-or-k)
      (throw (Exception. (str "Unable to resolve spec: " spec-or-k))))))
@@ -124,7 +127,7 @@
          (symbol? x) (reg-resolve! x)
          (set? x) (spec-impl form x nil nil)
          (regex? x) (spec-impl form x nil nil)
-         :else (if (clojure.core/and (not (map? x)) (ifn? x))
+         :else (if (c/and (not (map? x)) (ifn? x))
                  (if-let [s (fn-sym x)]
                    (spec-impl s x nil nil)
                    (spec-impl ::unknown x nil nil))
@@ -133,9 +136,9 @@
 ;; 158
 (defn- specize
   ([s]
-   (clojure.core/or (spec? s) (specize* s)))
+   (c/or (spec? s) (specize* s)))
   ([s form]
-   (clojure.core/or (spec? s) (specize* s form))))
+   (c/or (spec? s) (specize* s form))))
 
 ;; 162
 (defn invalid?
@@ -147,7 +150,7 @@
 
 (defn conform* [spec x]
   (cond (regex? spec)
-        (if (clojure.core/or (nil? x) (sequential? x))
+        (if (c/or (nil? x) (sequential? x))
           (re-conform spec (seq x))
           ::invalid)
         (:cform spec)
@@ -184,15 +187,15 @@
     (seq? form)
     (walk/postwalk (fn [form]
                      (cond
-                       (clojure.core/and (symbol? form) (namespace form))
+                       (c/and (symbol? form) (namespace form))
                        (-> form name symbol)
 
-                       (clojure.core/and (seq? form) (= 'fn (first form)) (= '[%] (second form)))
+                       (c/and (seq? form) (= 'fn (first form)) (= '[%] (second form)))
                        (last form)
                        :else form))
                    form)
 
-    (clojure.core/and (symbol? form) (namespace form))
+    (c/and (symbol? form) (namespace form))
     (-> form name symbol)
     :else form))
 
@@ -295,14 +298,14 @@
         :else x))
 ;; 314
 (defn- unfn [expr]
-  (if (clojure.core/and
+  (if (c/and
        (seq? expr)
        (let [fe (first expr)]
-         (clojure.core/and (symbol? fe)
+         (c/and (symbol? fe)
                            (let [n (name fe)]
                              ;; TODO: should we force edamame to produce fn*
                              ;; while parsing anon fns?
-                             (clojure.core/or (= "fn*" n)
+                             (c/or (= "fn*" n)
                                               (= "fn" n))))))
     (let [[[s] & form] (rest expr)]
       (conj (walk/postwalk-replace {s '%} form) '[%] 'fn))
@@ -312,7 +315,7 @@
 (defn- res [form]
   (cond
     (keyword? form) form
-    (symbol? form) (clojure.core/or (-> form resolve ->sym) form)
+    (symbol? form) (c/or (-> form resolve ->sym) form)
     (sequential? form) (walk/postwalk #(if (symbol? %) (res %) %) (unfn form))
     :else form))
 
@@ -320,10 +323,10 @@
 (defn def-impl
   "Do not call this directly, use 'def'"
   [k form spec]
-  (clojure.core/assert (clojure.core/and (ident? k) (namespace k)) "k must be namespaced keyword or resolvable symbol")
+  (c/assert (c/and (ident? k) (namespace k)) "k must be namespaced keyword or resolvable symbol")
   (if (nil? spec)
     (swap! registry-ref dissoc k)
-    (let [spec (if (clojure.core/or (spec? spec) #_(regex? spec) (get @registry-ref spec))
+    (let [spec (if (c/or (spec? spec) #_(regex? spec) (get @registry-ref spec))
                  spec
                  (spec-impl form spec nil nil))]
       (swap! registry-ref assoc k (with-name spec k))))
@@ -334,7 +337,7 @@
     "Qualify symbol s by resolving it or using the current *ns*."
     [s]
     (if-let [ns-sym (some-> s namespace symbol)]
-      (clojure.core/or (some-> (get (ns-aliases *ns*) ns-sym) str (symbol (name s)))
+      (c/or (some-> (get (ns-aliases *ns*) ns-sym) str (symbol (name s)))
                        s)
       (symbol (str (.name *ns*)) (str s))))
 
@@ -376,7 +379,7 @@
   (let [unk #(-> % name keyword)
         req-keys (filterv keyword? (flatten req))
         req-un-specs (filterv keyword? (flatten req-un))
-        _ (clojure.core/assert (every? #(clojure.core/and (keyword? %) (namespace %)) (concat req-keys req-un-specs opt opt-un))
+        _ (c/assert (every? #(c/and (keyword? %) (namespace %)) (concat req-keys req-un-specs opt opt-un))
                                "all keys must be namespace-qualified keywords")
         req-specs (into req-keys req-un-specs)
         req-keys (into req-keys (map unk req-un-specs))
@@ -394,7 +397,7 @@
         pred-exprs [`(map? ~gx)]
         pred-exprs (into pred-exprs (parse-req req identity))
         pred-exprs (into pred-exprs (parse-req req-un unk))
-        keys-pred `(fn* [~gx] (clojure.core/and ~@pred-exprs))
+        keys-pred `(fn* [~gx] (c/and ~@pred-exprs))
         pred-exprs (mapv (fn [e] `(fn* [~gx] ~e)) pred-exprs)
         pred-forms (walk/postwalk res pred-exprs)]
     `(map-spec-impl {:req '~req :opt '~opt :req-un '~req-un :opt-un '~opt-un
@@ -418,7 +421,7 @@
         keys (mapv first pairs)
         pred-forms (mapv second pairs)
         pf (mapv res pred-forms)]
-    (clojure.core/assert (clojure.core/and (even? (count key-pred-forms)) (every? keyword? keys)) "spec/or expects k1 p1 k2 p2..., where ks are keywords")
+    (c/assert (c/and (even? (count key-pred-forms)) (every? keyword? keys)) "spec/or expects k1 p1 k2 p2..., where ks are keywords")
     `(or-spec-impl ~keys '~pf ~pred-forms)))
 
 ;; 495
@@ -456,19 +459,19 @@
         nopts (-> opts
                   (dissoc :gen ::describe)
                   (assoc ::kind-form `'~(res (:kind opts))
-                         ::describe (clojure.core/or desc `'(every ~(res pred) ~@(res-kind opts)))))
+                         ::describe (c/or desc `'(every ~(res pred) ~@(res-kind opts)))))
         gx (gensym)
-        cpreds (cond-> [(list (clojure.core/or kind `coll?) gx)]
+        cpreds (cond-> [(list (c/or kind `coll?) gx)]
                  count (conj `(= ~count (bounded-count ~count ~gx)))
 
-                 (clojure.core/or min-count max-count)
-                 (conj `(<= (clojure.core/or ~min-count 0)
+                 (c/or min-count max-count)
+                 (conj `(<= (c/or ~min-count 0)
                             (bounded-count (if ~max-count (inc ~max-count) ~min-count) ~gx)
-                            (clojure.core/or ~max-count Integer/MAX_VALUE)))
+                            (c/or ~max-count Integer/MAX_VALUE)))
 
                  distinct
-                 (conj `(clojure.core/or (empty? ~gx) (apply distinct? ~gx))))]
-    `(every-impl '~pred ~pred ~(assoc nopts ::cpred `(fn* [~gx] (clojure.core/and ~@cpreds))) ~gen)))
+                 (conj `(c/or (empty? ~gx) (apply distinct? ~gx))))]
+    `(every-impl '~pred ~pred ~(assoc nopts ::cpred `(fn* [~gx] (c/and ~@cpreds))) ~gen)))
 
 ;; 570
 (defmacro every-kv
@@ -538,7 +541,7 @@
         keys (mapv first pairs)
         pred-forms (mapv second pairs)
         pf (mapv res pred-forms)]
-    (clojure.core/assert (clojure.core/and (even? (count key-pred-forms)) (every? keyword? keys)) "alt expects k1 p1 k2 p2..., where ks are keywords")
+    (c/assert (c/and (even? (count key-pred-forms)) (every? keyword? keys)) "alt expects k1 p1 k2 p2..., where ks are keywords")
     `(alt-impl ~keys ~pred-forms '~pf)))
 
 ;; 644
@@ -553,7 +556,7 @@
         keys (mapv first pairs)
         pred-forms (mapv second pairs)
         pf (mapv res pred-forms)]
-    (clojure.core/assert (clojure.core/and (even? (count key-pred-forms)) (every? keyword? keys)) "cat expects k1 p1 k2 p2..., where ks are keywords")
+    (c/assert (c/and (even? (count key-pred-forms)) (every? keyword? keys)) "cat expects k1 p1 k2 p2..., where ks are keywords")
     ;; (prn "pf" pf) ;; too soon
     `(cat-impl ~keys ~pred-forms '~pf)))
 
@@ -584,7 +587,7 @@
   where each element conforms to the corresponding pred. Each element
   will be referred to in paths using its ordinal."
   [& preds]
-  (clojure.core/assert (seq preds))
+  (c/assert (seq preds))
   `(tuple-impl '~(mapv res preds) ~(vec preds)))
 
 ;; 704:
@@ -641,7 +644,7 @@
   [{:keys [req-un opt-un keys-pred pred-exprs opt-keys req-specs req req-keys opt-specs pred-forms opt gfn]
     :as argm}]
   (let [k->s (zipmap (concat req-keys opt-keys) (concat req-specs opt-specs))
-        keys->specnames #(clojure.core/or (k->s %) %)
+        keys->specnames #(c/or (k->s %) %)
         id (java.util.UUID/randomUUID)]
     {:type ::spec
      :id id
@@ -673,7 +676,7 @@
                              #(identity {:path path :pred % :val x :via via :in in})
                              probs))
                           (map (fn [[k v]]
-                                 (when-not (clojure.core/or (not (contains? reg (keys->specnames k)))
+                                 (when-not (c/or (not (contains? reg (keys->specnames k)))
                                                             (pvalid? (keys->specnames k) v k))
                                    (explain-1 (keys->specnames k) (keys->specnames k) (conj path k) via (conj in k) v)))
                                (seq x))))))
@@ -711,7 +714,7 @@
        {:type ::spec
         :cform (fn [_ x]
                  (let [specs @specs]
-                   (if-not (clojure.core/and (vector? x)
+                   (if-not (c/and (vector? x)
                                              (= (count x) cnt))
                      ::invalid
                      (loop [ret x, i 0]
@@ -864,7 +867,7 @@
    :cform (fn [_ x] (let [ms (map #(dt %1 x %2) preds forms)]
                       (if (some invalid? ms)
                         ::invalid
-                        (apply clojure.core/merge ms))))
+                        (apply c/merge ms))))
    :explain (fn [_ path via in x]
               (apply concat
                      (map #(explain-1 %1 %2 path via in x)
@@ -874,21 +877,21 @@
 ;; 1255
 (defn- coll-prob [x kfn kform distinct count min-count max-count
                   path via in]
-  (let [pred (clojure.core/or kfn coll?)
-        kform (clojure.core/or kform `coll?)]
+  (let [pred (c/or kfn coll?)
+        kform (c/or kform `coll?)]
     (cond
       (not (pvalid? pred x))
       (explain-1 kform pred path via in x)
 
-      (clojure.core/and count (not= count (bounded-count count x)))
+      (c/and count (not= count (bounded-count count x)))
       [{:path path :pred `(= ~count (c/count ~'%)) :val x :via via :in in}]
 
-      (clojure.core/and (clojure.core/or min-count max-count)
-             (not (<= (clojure.core/or min-count 0)
+      (c/and (c/or min-count max-count)
+             (not (<= (c/or min-count 0)
                       (bounded-count (if max-count (inc max-count) min-count) x)
-                      (clojure.core/or max-count Integer/MAX_VALUE))))
-      [{:path path :pred `(<= ~(clojure.core/or min-count 0) (c/count ~'%) ~(clojure.core/or max-count 'Integer/MAX_VALUE)) :val x :via via :in in}]
-      (clojure.core/and distinct (seq x) (not (apply distinct? x)))
+                      (c/or max-count Integer/MAX_VALUE))))
+      [{:path path :pred `(<= ~(c/or min-count 0) (c/count ~'%) ~(c/or max-count 'Integer/MAX_VALUE)) :val x :via via :in in}]
+      (c/and distinct (seq x) (not (apply distinct? x)))
       [{:path path :pred 'distinct? :val x :via via :in in}])))
 
 ;; 1245
@@ -908,12 +911,12 @@
      (let [;; gen-into (if conform-into (empty conform-into) (get empty-coll kind-form))
            spec (delay (specize pred))
            check? #(valid? @spec %)
-           kfn (clojure.core/or kfn (fn [i v] i))
+           kfn (c/or kfn (fn [i v] i))
            addcv (fn [ret i v cv] (conj ret cv))
            cfns (fn [x]
                   ;;returns a tuple of [init add complete] fns
                   (cond
-                   (clojure.core/and (vector? x) (clojure.core/or (not conform-into) (vector? conform-into)))
+                   (c/and (vector? x) (c/or (not conform-into) (vector? conform-into)))
                    [identity
                     (fn [ret i v cv]
                       (if (identical? v cv)
@@ -921,18 +924,18 @@
                         (assoc ret i cv)))
                     identity]
 
-                   (clojure.core/and (map? x) (clojure.core/or (clojure.core/and kind (not conform-into)) (map? conform-into)))
+                   (c/and (map? x) (c/or (c/and kind (not conform-into)) (map? conform-into)))
                    [(if conform-keys empty identity)
                     (fn [ret i v cv]
-                      (if (clojure.core/and (identical? v cv) (not conform-keys))
+                      (if (c/and (identical? v cv) (not conform-keys))
                         ret
                         (assoc ret (nth (if conform-keys cv v) 0) (nth cv 1))))
                     identity]
 
-                   (clojure.core/or (list? conform-into) (seq? conform-into) (clojure.core/and (not conform-into) (clojure.core/or (list? x) (seq? x))))
+                   (c/or (list? conform-into) (seq? conform-into) (c/and (not conform-into) (c/or (list? x) (seq? x))))
                    [(constantly ()) addcv reverse]
 
-                   :else [#(empty (clojure.core/or conform-into %)) addcv identity]))]
+                   :else [#(empty (c/or conform-into %)) addcv identity]))]
        {:type ::spec
         :cform (fn [_ x]
                  (let [spec @spec]
@@ -950,21 +953,21 @@
                            (complete ret))))
                      :else
                      (if (indexed? x)
-                       (let [step (max 1 (long (/ (clojure.core/count x) *coll-check-limit*)))]
+                       (let [step (max 1 (long (/ (c/count x) *coll-check-limit*)))]
                          (loop [i 0]
-                           (if (>= i (clojure.core/count x))
+                           (if (>= i (c/count x))
                              x
                              (if (valid? spec (nth x i))
-                               (recur (clojure.core/+ i step))
+                               (recur (c/+ i step))
                                ::invalid))))
                        (let [limit *coll-check-limit*]
                          (loop [i 0 [v & vs :as vseq] (seq x)]
                            (cond
-                             (clojure.core/or (nil? vseq) (= i limit)) x
+                             (c/or (nil? vseq) (= i limit)) x
                              (valid? spec v) (recur (inc i) vs)
                              :else ::invalid)))))))
         :explain (fn [_ path via in x]
-                   (clojure.core/or (coll-prob x kind kind-form distinct count min-count max-count
+                   (c/or (coll-prob x kind kind-form distinct count min-count max-count
                                                path via in)
                                     (apply concat
                                            ((if conform-all identity (partial take *coll-error-limit*))
@@ -975,7 +978,7 @@
                                                              (let [prob (explain-1 form pred path via (conj in k) v)]
                                                                prob))))
                                                        (range) x))))))
-        :describe (fn [_] (clojure.core/or describe-form `(every ~(res form) ~@(mapcat identity opts))))})))
+        :describe (fn [_] (c/or describe-form `(every ~(res form) ~@(mapcat identity opts))))})))
 
 
 ;; 1382
@@ -1029,10 +1032,10 @@
 
 ;; 1425
 (defn- filter-alt [ps ks forms f]
-  (if (clojure.core/or ks forms)
+  (if (c/or ks forms)
     (let [pks (->> (map vector ps
-                        (clojure.core/or (seq ks) (repeat nil))
-                        (clojure.core/or (seq forms) (repeat nil)))
+                        (c/or (seq ks) (repeat nil))
+                        (c/or (seq forms) (repeat nil)))
                    (filter #(-> % first f)))]
       [(seq (map first pks)) (when ks (seq (map second pks))) (when forms (seq (map #(nth % 2) pks)))])
     [(seq (filter f ps)) ks forms]))
@@ -1053,7 +1056,7 @@
 ;; 1446
 (defn- alts [& ps] (alt* ps nil nil))
 ;; 1447
-(defn- alt2 [p1 p2] (if (clojure.core/and p1 p2) (alts p1 p2) (clojure.core/or p1 p2)))
+(defn- alt2 [p1 p2] (if (c/and p1 p2) (alts p1 p2) (c/or p1 p2)))
 
 ;; 1449
 (defn alt-impl
@@ -1066,8 +1069,8 @@
 
 ;; 1457
 (defn- noret? [p1 pret]
-  (clojure.core/or (= pret ::nil)
-                   (clojure.core/and (#{::rep ::pcat} (::op (reg-resolve! p1))) ;;hrm, shouldn't know these
+  (c/or (= pret ::nil)
+                   (c/and (#{::rep ::pcat} (::op (reg-resolve! p1))) ;;hrm, shouldn't know these
                                      (empty? pret))
                    nil))
 
@@ -1080,12 +1083,12 @@
     (case op
       ::accept true
       nil nil
-      ::amp (clojure.core/and (accept-nil? p1)
+      ::amp (c/and (accept-nil? p1)
                               (let [ret (-> (preturn p1) (and-preds ps (next forms)))]
                                 (not (invalid? ret))))
-      ::rep (clojure.core/or (identical? p1 p2) (accept-nil? p1))
+      ::rep (c/or (identical? p1 p2) (accept-nil? p1))
       ::pcat (every? accept-nil? ps)
-      ::alt (clojure.core/some accept-nil? ps))))
+      ::alt (c/some accept-nil? ps))))
 
 ;; 1477
 (declare add-ret)
@@ -1164,7 +1167,7 @@
         ::amp (list* 'clojure.spec.alpha/& amp forms)
         ::pcat (if rep+
                  (list `+ rep+)
-                 (cons `cat (mapcat vector (clojure.core/or (seq ks) (repeat :_)) forms)))
+                 (cons `cat (mapcat vector (c/or (seq ks) (repeat :_)) forms)))
         ::alt (if maybe
                 (list `? maybe)
                 (cons `alt (mapcat vector ks forms)))
@@ -1198,28 +1201,28 @@
                       (op-explain (:amp p) p1 path via in input)))
             ::pcat (let [pkfs (map vector
                                    ps
-                                   (clojure.core/or (seq ks) (repeat nil))
-                                   (clojure.core/or (seq forms) (repeat nil)))
+                                   (c/or (seq ks) (repeat nil))
+                                   (c/or (seq forms) (repeat nil)))
                          [pred k form] (if (= 1 (count pkfs))
                                          (first pkfs)
                                          (first (remove (fn [[p]] (accept-nil? p)) pkfs)))
                          path (if k (conj path k) path)
-                         form (clojure.core/or form (op-describe pred))]
-                     (if (clojure.core/and (empty? input) (not pred))
+                         form (c/or form (op-describe pred))]
+                     (if (c/and (empty? input) (not pred))
                        (insufficient path form)
                        (op-explain form pred path via in input)))
             ::alt (if (empty? input)
                     (insufficient path (op-describe p))
                     (apply concat
                            (map (fn [k form pred]
-                                  (op-explain (clojure.core/or form (op-describe pred))
+                                  (op-explain (c/or form (op-describe pred))
                                               pred
                                               (if k (conj path k) path)
                                               via
                                               in
                                               input))
-                                (clojure.core/or (seq ks) (repeat nil))
-                                (clojure.core/or (seq forms) (repeat nil))
+                                (c/or (seq ks) (repeat nil))
+                                (c/or (seq forms) (repeat nil))
                                 ps)))
             ::rep (op-explain (if (identical? p1 p2)
                                 forms
@@ -1259,7 +1262,7 @@
               :val data
               :via via
               :in (conj in i)}])
-          (clojure.core/or (op-explain (op-describe p) p path via (conj in i) (seq data))
+          (c/or (op-explain (op-describe p) p path via (conj in i) (seq data))
                 [{:path path
                   :reason "Extra input"
                   :pred (op-describe p)
@@ -1274,13 +1277,13 @@
   (assoc re
          :type ::spec
          :cform (fn [_ x]
-                  (if (clojure.core/or (nil? x) (sequential? x))
+                  (if (c/or (nil? x) (sequential? x))
                     (re-conform re (seq x))
                     ::invalid))
          :explain (fn [_ path via in x]
-                    (if (clojure.core/or (nil? x) (sequential? x))
+                    (if (c/or (nil? x) (sequential? x))
                       (re-explain path via in re (seq x))
-                      [{:path path :pred (res `#(clojure.core/or (nil? %) (sequential? %))) :val x :via via :in in}]))
+                      [{:path path :pred (res `#(c/or (nil? %) (sequential? %))) :val x :via via :in in}]))
          :describe (fn [_] (op-describe re))))
 
 ;; 1794
@@ -1311,7 +1314,7 @@
     {:type ::spec
      :cform (fn [_ x] (if (nil? x) nil (conform* @spec x)))
      :explain (fn [_ path via in x]
-                (when-not (clojure.core/or (pvalid? @spec x) (nil? x))
+                (when-not (c/or (pvalid? @spec x) (nil? x))
                   (conj
                    (explain-1 form pred (conj path ::pred) via in x)
                    {:path (conj path ::nil) :pred 'nil? :val x :via via :in in})))
@@ -1358,7 +1361,7 @@ system property. Defaults to false."
   [spec x]
   (if (valid? spec x)
     x
-    (let [ed (clojure.core/merge (assoc (explain-data* spec [] [] [] x)
+    (let [ed (c/merge (assoc (explain-data* spec [] [] [] x)
                                         ::failure :assertion-failed))]
       (throw (ex-info
               (str "Spec assertion failed\n" (with-out-str (explain-out ed)))
