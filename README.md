@@ -9,10 +9,11 @@ A spartan implementation of clojure.spec.alpha compatible with
 
 ## Rationale
 
-Currently babashka doesn't have a built-in implementation of
-`clojure.spec.alpha`. This library can be used meanwhile. If the application of
-spec in scripting turns out to be useful, babashka will probably bundle a
-built-in implementation of spec2 at some point which will be more performant than this interpreted version.
+Currently [babashka](https://github.com/babashka/babashka) doesn't have a
+built-in implementation of `clojure.spec.alpha`. This library can be used
+meanwhile. If the application of spec in scripting turns out to be useful,
+babashka will probably bundle a built-in implementation of spec2 at some point
+which will be more performant than this interpreted version.
 
 ## Differences with clojure.spec.alpha
 
@@ -31,6 +32,8 @@ Usage in a `deps.edn` project:
 Requiring `spartan.spec` will create a namespace `clojure.spec.alpha` for compatibility.
 
 ## Example
+
+This is an example that you can run with babashka:
 
 ``` clojure
 (ns expound
