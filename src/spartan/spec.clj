@@ -10,7 +10,9 @@
 ;;   the terms of this license.
 ;;   You must not remove this notice, or any other, from this software.
 
-(ns spartan.spec
+(ns spartan.spec)
+
+(ns clojure.spec.alpha ;; DANGER!
   (:refer-clojure :exclude [+ * and assert or cat def keys merge])
   (:require [clojure.walk :as walk]
             [clojure.main :refer [demunge]]))
@@ -167,6 +169,9 @@
 
 ;; 173
 ;; unform: TODO
+(defmacro unform [& _args]
+  (binding [*out* *err*]
+    (prn "WARNING: spartan.spec doesn't have unform yet")))
 
 (defn describe* [spec]
   (if-let [d (:describe spec)]
@@ -207,6 +212,9 @@
 
 ;; 210:
 ;; with-gen: TODO
+(defmacro with-gen [& _args]
+  (binding [*out* *err*]
+    (prn "WARNING: spartan.spec doesn't have with-gen yet")))
 
 (defn explain* [spec path via in x]
   (let [{explain-f :explain} spec]
@@ -371,7 +379,8 @@
     `(spec-impl '~(res form) ~form ~gen nil)))
 
 ;; 387
-;; multi-spec: TODO
+(defmacro multi-spec [mm retag]
+  `(multi-spec-impl ~mm ~retag))
 
 ;; 416
 (defmacro keys
@@ -594,7 +603,9 @@
 ;; macroexpand-check: TODO
 
 ;; 716:
-;; fdef: TODO
+(defmacro fdef [& _args]
+  (binding [*out* *err*]
+    (prn "WARNING: spartan.spec doesn't have fdef yet")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; impl ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -703,6 +714,17 @@
                  (when (invalid? (dt pred x form cpred?))
                    [{:path path :pred form :val x :via via :in in}]))
       :describe (fn [_] form)})))
+
+;;; 948
+(defn multi-spec-impl [mm retag]
+  (let [id (gensym)
+        predx #(let [mm mm]
+                 (mm %))]
+    {:type ::spec
+     :cform  (fn [_ x]
+               (if-let [pred (predx x)]
+                 (dt pred x nil #_form)
+                 ::invalid))}))
 
 ;; 998
 (defn ^:skip-wiki tuple-impl
@@ -1287,7 +1309,7 @@
          :describe (fn [_] (op-describe re))))
 
 ;; 1794
-(spartan.spec/def ::kvs->map (conformer #(zipmap (map ::k %) (map ::v %)) #(map (fn [[k v]] {::k k ::v v}) %)))
+(clojure.spec.alpha/def ::kvs->map (conformer #(zipmap (map ::k %) (map ::v %)) #(map (fn [[k v]] {::k k ::v v}) %)))
 
 ;; 1796
 (defmacro keys*
