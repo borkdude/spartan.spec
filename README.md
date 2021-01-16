@@ -36,9 +36,10 @@ Requiring `spartan.spec` will create a namespace `clojure.spec.alpha` for compat
 (ns expound
   (:require [babashka.deps :as deps]))
 
-(deps/add-deps '{:deps {borkdude/spartan.spec {:git/url "https://github.com/borkdude/spartan.spec"
-                                               :sha "e5c9f40ebcc64b27b3e3e83ad2a285ccc0997097"}
-                        expound/expound {:mvn/version "0.8.7"}}})
+(deps/add-deps
+ '{:deps {borkdude/spartan.spec {:git/url "https://github.com/borkdude/spartan.spec"
+                                 :sha "bf4ace4a857c29cbcbb934f6a4035cfabe173ff1"}
+          expound/expound {:mvn/version "0.8.7"}}})
 
 ;; Loading spartan.spec will create a namespace clojure.spec.alpha for compatibility:
 (require 'spartan.spec)
