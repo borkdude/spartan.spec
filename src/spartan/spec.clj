@@ -343,13 +343,13 @@
   k)
 
 ;; 341
-#_(defn- ns-qualify
+(defn- ns-qualify
     "Qualify symbol s by resolving it or using the current *ns*."
     [s]
     (if-let [ns-sym (some-> s namespace symbol)]
       (c/or (some-> (get (ns-aliases *ns*) ns-sym) str (symbol (name s)))
                        s)
-      (symbol (str (.name *ns*)) (str s))))
+      (symbol (str (ns-name *ns*)) (str s))))
 
 ;; 349
 (defmacro def
@@ -358,8 +358,7 @@
   registry mapping k to the spec. Use nil to remove an entry in
   the registry for k."
   [k spec-form]
-  (let [k (if (symbol? k) (throw (Exception. "Only keywords allowed for now"))
-              #_(ns-qualify k) k)]
+  (let [k (if (symbol? k) (ns-qualify k) k)]
     `(def-impl '~k '~(res spec-form) ~spec-form)))
 
 ;; 358
@@ -590,7 +589,21 @@
   ([f unf] `(spec-impl '(conformer ~(res f) ~(res unf)) ~f nil true ~unf)))
 
 ;; 676
-;; fspec: TODO
+(defmacro fspec
+  "takes :args :ret and (optional) :fn kwargs whose values are preds
+  and returns a spec whose conform/explain take a fn and validates it
+  using generative testing. The conformed value is always the fn itself.
+  See 'fdef' for a single operation that creates an fspec and
+  registers it, as well as a full description of :args, :ret and :fn
+  fspecs can generate functions that validate the arguments and
+  fabricate a return value compliant with the :ret spec, ignoring
+  the :fn spec if present.
+  Optionally takes :gen generator-fn, which must be a fn of no args
+  that returns a test.check generator."
+  [& {:keys [args ret fn gen] :or {ret `any?}}]
+  `(fspec-impl (spec ~args) '~(res args)
+               (spec ~ret) '~(res ret)
+               (spec ~fn) '~(res fn) ~gen))
 
 ;; 696
 (defmacro tuple
@@ -605,9 +618,9 @@
 ;; macroexpand-check: TODO
 
 ;; 716:
-(defmacro fdef [& _args]
-  (binding [*out* *err*]
-    (prn "WARNING: spartan.spec doesn't have fdef yet")))
+(defmacro fdef
+  [fn-sym & specs]
+  `(clojure.spec.alpha/def ~fn-sym (clojure.spec.alpha/fspec ~@specs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; impl ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1309,6 +1322,51 @@
                       (re-explain path via in re (seq x))
                       [{:path path :pred (res `#(c/or (nil? %) (sequential? %))) :val x :via via :in in}]))
          :describe (fn [_] (op-describe re))))
+
+;; 1737
+(defn- validate-fn
+  "returns f if valid, else smallest"
+  [f specs iters]
+  #_(let [g (gen (:args specs))
+        prop (gen/for-all* [g] #(call-valid? f specs %))]
+    (let [ret (gen/quick-check iters prop)]
+      (if-let [[smallest] (-> ret :shrunk :smallest)]
+        smallest
+        f))))
+
+;; 1747
+(defn ^:skip-wiki fspec-impl
+  "Do not call this directly, use 'fspec'"
+  [argspec aform retspec rform fnspec fform gfn]
+  (let [specs {:args argspec :ret retspec :fn fnspec}]
+    (assoc specs
+           :type ::spec
+           :cform (fn [this _f]
+                    (throw (Exception. (str "Not implemented in spartan.spec.Can't conform fspec without args spec: " (pr-str (describe this)))))
+                    #_(if argspec
+                      (if (ifn? f)
+                        (if (identical? f (validate-fn f specs *fspec-iterations*)) f ::invalid)
+                        ::invalid)
+                      (throw (Exception. (str "Can't conform fspec without args spec: " (pr-str (describe this)))))))
+           :explain (fn [_ path via in f]
+                      (if (ifn? f)
+                        (let [args (validate-fn f specs 100)]
+                          (if (identical? f args) ;;hrm, we might not be able to reproduce
+                            nil
+                            (let [ret (try (apply f args) (catch Throwable t t))]
+                              (if (instance? Throwable ret)
+                                ;;TODO add exception data
+                                [{:path path :pred '(apply fn) :val args :reason (.getMessage ^Throwable ret) :via via :in in}]
+
+                                (let [cret (dt retspec ret rform)]
+                                  (if (invalid? cret)
+                                    (explain-1 rform retspec (conj path :ret) via in ret)
+                                    (when fnspec
+                                      (let [cargs (conform argspec args)]
+                                        (explain-1 fform fnspec (conj path :fn) via in {:args cargs :ret cret})))))))))
+                        [{:path path :pred 'ifn? :val f :via via :in in}]))
+           :describe (fn [_]
+                       `(fspec :args ~aform :ret ~rform :fn ~fform)))))
 
 ;; 1794
 (clojure.spec.alpha/def ::kvs->map (conformer #(zipmap (map ::k %) (map ::v %)) #(map (fn [[k v]] {::k k ::v v}) %)))

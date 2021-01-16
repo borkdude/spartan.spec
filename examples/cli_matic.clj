@@ -51,3 +51,4 @@
                   :runs        subtract_numbers}]})
 
 (run-cmd *command-line-args* CONFIGURATION)
+;; example command line args: add -a1 1 -a2 2
