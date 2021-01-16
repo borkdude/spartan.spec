@@ -11,8 +11,6 @@
 
 (binding [*err* (java.io.StringWriter.)] (require '[expound.alpha :as expound]))
 
-(expound/expound string? 1)
+(s/def ::a (s/cat :i int? :j string?))
 
-(s/def ::a string?)
-
-(expound/expound ::a 1)
+(expound/expound ::a [1 2])
