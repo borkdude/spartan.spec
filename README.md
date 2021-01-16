@@ -47,11 +47,28 @@ Requiring `spartan.spec` will create a namespace `clojure.spec.alpha` for compat
 (binding [*err* (java.io.StringWriter.)]
   (require '[expound.alpha :as expound]))
 
-(expound/expound string? 1)
-
 (s/def ::a string?)
 
 (expound/expound ::a 1)
+```
+
+Output:
+
+``` shell
+-- Spec failed --------------------
+
+  1
+
+should satisfy
+
+  string?
+
+-- Relevant specs -------
+
+:expound/a:
+  clojure.core/string?
+
+-------------------------
 ```
 
 ## Tests
