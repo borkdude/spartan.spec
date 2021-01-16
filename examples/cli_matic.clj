@@ -1,3 +1,4 @@
+;; hack: bb doesn't have java.text.DateFormat, conversions are done using java.time
 (ns java.text)
 (defrecord SimpleDateFormat [])
 
