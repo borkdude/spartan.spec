@@ -40,7 +40,8 @@ Requiring `spartan.spec` will create a namespace `clojure.spec.alpha` for compat
                                                :sha "e5c9f40ebcc64b27b3e3e83ad2a285ccc0997097"}
                         expound/expound {:mvn/version "0.8.7"}}})
 
-(require 'spartan.spec) ;; DANGER: loading spartan.spec will create a namespace clojure.spec.alpha for compatibility
+;; Loading spartan.spec will create a namespace clojure.spec.alpha for compatibility:
+(require 'spartan.spec)
 (require '[clojure.spec.alpha :as s])
 
 ;; Expound expects some vars to be there, like `with-gen`. Spartan prints warnings that these are used, but doesn't implement them yet.
