@@ -12,6 +12,8 @@
 
 (ns spartan.spec)
 
+(ns clojure.spec.gen.alpha)
+
 (ns clojure.spec.alpha ;; DANGER!
   (:refer-clojure :exclude [+ * and assert or cat def keys merge])
   (:require [clojure.walk :as walk]
