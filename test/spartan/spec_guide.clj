@@ -1,5 +1,8 @@
-(ns spartan.spec-guide
-  (:require [spartan.spec :as s]))
+(ns spartan.spec-guide)
+
+(require 'spartan.spec) ;; side effect
+
+(require '[clojure.spec.alpha :as s])
 
 (s/conform even? 1000)
 (s/valid? even? 10)

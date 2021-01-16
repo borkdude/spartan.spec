@@ -1,8 +1,12 @@
 (ns spartan.spec-test
-  (:require ;; [clojure.spec.alpha :as s]
-   [spartan.spec :as s]
-   [spartan.test :as t :refer [deftest is]]
-   [clojure.string :as str]))
+  (:require
+   [clojure.string :as str]
+   [spartan.test :as t :refer [deftest is]]))
+
+(require 'spartan.spec) ;; side effect
+
+(require '[clojure.spec.alpha :as s])
+
 
 (deftest pred-test
   (is (= 1 (s/conform int? 1)))
@@ -97,8 +101,8 @@
   (is (= {:i 1} (s/conform (s/cat :i (s/nilable int?)) [1])))
   (is (= {:i nil} (s/conform (s/cat :i (s/nilable int?)) [nil])))
   (is (= (str/trim "
-:foo - failed: int? in: [0] at: [:i :spartan.spec/pred]
-:foo - failed: nil? in: [0] at: [:i :spartan.spec/nil]\n")
+:foo - failed: int? in: [0] at: [:i :clojure.spec.alpha/pred]
+:foo - failed: nil? in: [0] at: [:i :clojure.spec.alpha/nil]\n")
          (str/trim (with-out-str (s/explain (s/cat :i (s/nilable int?)) [:foo])))))
   (is (= '(nilable int?) (s/describe (s/nilable int?)))))
 

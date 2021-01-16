@@ -1326,9 +1326,9 @@
   user=> (s/conform (s/cat :i1 integer? :m (s/keys* :req-un [::a ::c]) :i2 integer?) [42 :a 1 :c 2 :d 4 99])
   {:i1 42, :m {:a 1, :c 2, :d 4}, :i2 99}"
   [& kspecs]
-  `(let [mspec# (spartan.spec/keys ~@kspecs)]
+  `(let [mspec# (clojure.spec.alpha/keys ~@kspecs)]
      ;; NOTE: deleted with/gen
-     (spartan.spec/& (spartan.spec/* (spartan.spec/cat ::k keyword? ::v any?)) ::kvs->map mspec#)))
+     (clojure.spec.alpha/& (clojure.spec.alpha/* (clojure.spec.alpha/cat ::k keyword? ::v any?)) ::kvs->map mspec#)))
 
 ;; 1836
 (defn nilable-impl
