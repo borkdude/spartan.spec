@@ -139,3 +139,7 @@
                (try (s/assert int? "foo")
                     (catch clojure.lang.ExceptionInfo e
                       (ex-message e))))))
+
+(deftest explain-str-test
+  (s/def ::str string?)
+  (is (= "1 - failed: string? spec: :spartan.spec-test/str\n" (s/explain-str ::str 1))))

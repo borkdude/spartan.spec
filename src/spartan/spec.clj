@@ -288,6 +288,12 @@
   [spec x]
   (explain-out (explain-data spec x)))
 
+;; 272:
+(defn explain-str
+  "Given a spec and a value that fails to conform, returns an explanation as a string."
+  ^String [spec x]
+  (with-out-str (explain spec x)))
+
 ;; 277
 (declare valid?)
 
