@@ -1415,6 +1415,20 @@
   (let [pf (res pred)]
     `(nilable-impl '~pf ~pred)))
 
+;; 1910
+(defn int-in-range?
+  "Return true if start <= val, val < end and val is a fixed
+  precision integer."
+  [start end val]
+  (c/and (int? val) (<= start val) (< val end)))
+
+;; 1916
+(defmacro int-in
+  "Returns a spec that validates fixed precision integers in the
+  range from start (inclusive) to end (exclusive)."
+  [start end]
+  `(spec (and int? #(int-in-range? ~start ~end %))))
+
 ;; 1941
 #_(defonce
   ^{:dynamic true

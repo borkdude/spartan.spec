@@ -143,3 +143,8 @@
 (deftest explain-str-test
   (s/def ::str string?)
   (is (= "1 - failed: string? spec: :spartan.spec-test/str\n" (s/explain-str ::str 1))))
+
+(deftest int-in-test
+  (s/def ::int-in (s/int-in 0 10))
+  (is (s/valid? ::int-in 9))
+  (is (= "11 - failed: (and int? (fn* [%1] (int-in-range? 0 10 %1))) spec: :spartan.spec-test/int-in\n" (s/explain-str ::int-in 11))))
