@@ -101,11 +101,11 @@
   "spec-or-k must be a spec, regex or resolvable kw/sym, else returns nil."
   [spec-or-k]
   (let [s (c/or (c/and (ident? spec-or-k) (reg-resolve spec-or-k))
-                           (spec? spec-or-k)
-                           (regex? spec-or-k)
-                           nil)]
+                (spec? spec-or-k)
+                (regex? spec-or-k)
+                nil)]
     (if (regex? s)
-      (with-name s (spec-name s))
+      (with-name (regex-spec-impl s nil) (spec-name s))
       s)))
 
 ;; 121

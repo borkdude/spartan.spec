@@ -33,7 +33,22 @@
   (is (s/invalid? (s/conform (s/and number? #(> % 5)) 5)))
   (is (= "5 - failed: (> % 5)\n"
          (with-out-str (s/explain (s/and number? #(> % 5)) 5))))
-  (is (= '(and number? (> % 5)) (s/describe (s/and number? #(> % 5))))))
+  (is (= '(and number? (> % 5)) (s/describe (s/and number? #(> % 5)))))
+  (is (= 'clojure.core/int?
+         (-> (s/explain-data
+              (s/and (s/cat :x1 int?)
+                     vector?)
+              ["foo"])
+             :clojure.spec.alpha/problems
+             first
+             :pred)))
+  (is (= 'clojure.core/int?
+         (-> (s/explain-data
+              (s/or :foo (s/cat :x1 int?))
+              ["foo"])
+             :clojure.spec.alpha/problems
+             first
+             :pred))))
 
 (deftest or-test
   (is (= [:a 1] (s/conform (s/or :a int? :b string?) 1)))
