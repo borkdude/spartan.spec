@@ -1317,17 +1317,18 @@
 (defn regex-spec-impl
   "Do not call this directly, use 'spec' with a regex op argument"
   [re gfn]
-  (assoc re
-         :type ::spec
-         :cform (fn [_ x]
-                  (if (c/or (nil? x) (sequential? x))
-                    (re-conform re (seq x))
-                    ::invalid))
-         :explain (fn [_ path via in x]
-                    (if (c/or (nil? x) (sequential? x))
-                      (re-explain path via in re (seq x))
-                      [{:path path :pred (res `#(c/or (nil? %) (sequential? %))) :val x :via via :in in}]))
-         :describe (fn [_] (op-describe re))))
+  (-> re
+      (dissoc ::op)
+      (assoc  :type ::spec
+              :cform (fn [_ x]
+                       (if (c/or (nil? x) (sequential? x))
+                         (re-conform re (seq x))
+                         ::invalid))
+              :explain (fn [_ path via in x]
+                         (if (c/or (nil? x) (sequential? x))
+                           (re-explain path via in re (seq x))
+                           [{:path path :pred (res `#(c/or (nil? %) (sequential? %))) :val x :via via :in in}]))
+              :describe (fn [_] (op-describe re)))))
 
 ;; 1737
 (defn- validate-fn

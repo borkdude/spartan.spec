@@ -19,7 +19,17 @@
   (is (= {:a 1, :b "foo"} (s/conform (s/cat :a int? :b string?) [1 "foo"])))
   (is (s/invalid? (s/conform (s/cat :a int? :b string?) [1 "foo" "bar"])))
   (is (= "1 - failed: string? in: [0] at: [:i]\n" (with-out-str (s/explain (s/cat :i string?) [1]))))
-  (is (= '(cat :a int? :b string?) (s/describe (s/cat :a int? :b string?)))))
+  (is (= '(cat :a int? :b string?) (s/describe (s/cat :a int? :b string?))))
+  (is (= {:path [:bs],
+           :val "foo",
+           :via [],
+           :in [0 0]}
+         (-> (s/explain-data
+              (s/cat :bs (s/spec (s/+ int?)))
+              [["foo"]])
+             :clojure.spec.alpha/problems
+             first
+             (dissoc :pred)))))
 
 (deftest alt-test
   (is (= [:a 1] (s/conform (s/alt :a int? :b string?) [1])))
