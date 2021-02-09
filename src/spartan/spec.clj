@@ -1430,6 +1430,22 @@
   [start end]
   `(spec (and int? #(int-in-range? ~start ~end %))))
 
+;; 1923
+(defmacro double-in
+  "Specs a 64-bit floating point number. Options:
+    :infinite? - whether +/- infinity allowed (default true)
+    :NaN?      - whether NaN allowed (default true)
+    :min       - minimum value (inclusive, default none)
+    :max       - maximum value (inclusive, default none)"
+  [& {:keys [infinite? NaN? min max]
+    :or {infinite? true NaN? true}
+    :as m}]
+  `(spec (and c/double?
+              ~@(when-not infinite? '[#(not (Double/isInfinite %))])
+              ~@(when-not NaN? '[#(not (Double/isNaN %))])
+              ~@(when max `[#(<= % ~max)])
+              ~@(when min `[#(<= ~min %)]))))
+
 ;; 1941
 #_(defonce
   ^{:dynamic true
