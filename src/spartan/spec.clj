@@ -59,7 +59,7 @@
   [k]
   (if (ident? k)
     (c/or (reg-resolve k)
-                     (throw (Exception. (str "Unable to resolve spec: " k))))
+          (throw (Exception. (str "Unable to resolve spec: " k))))
     k))
 
 ;; 79
@@ -127,8 +127,8 @@
 (defn specize*
   ([x] (specize* x nil))
   ([x form]
-   (cond (keyword? x) (reg-resolve! x)
-         (symbol? x) (reg-resolve! x)
+   (cond (keyword? x) (specize* (reg-resolve! x))
+         (symbol? x) (specize* (reg-resolve! x))
          (set? x) (spec-impl form x nil nil)
          (regex? x) (spec-impl form x nil nil)
          :else (if (c/and (not (map? x)) (ifn? x))
@@ -342,7 +342,7 @@
   (c/assert (c/and (ident? k) (namespace k)) "k must be namespaced keyword or resolvable symbol")
   (if (nil? spec)
     (swap! registry-ref dissoc k)
-    (let [spec (if (c/or (spec? spec) #_(regex? spec) (get @registry-ref spec))
+    (let [spec (if (c/or (spec? spec) (regex? spec) (get @registry-ref spec))
                  spec
                  (spec-impl form spec nil nil))]
       (swap! registry-ref assoc k (with-name spec k))))
@@ -720,22 +720,25 @@
                                opt-un (conj :opt-un opt-un))))}))
 
 ;; 915
-(defn spec-impl
+(defn ^:skip-wiki spec-impl
+  "Do not call this directly, use 'spec'"
   ([form pred gfn cpred?] (spec-impl form pred gfn cpred? nil))
-  ([form pred gfn cpred? unc]
-   (if (regex? pred)
-     (regex-spec-impl pred gfn)
-     {:type ::spec
-      :form form
-      :cform (fn [_ x] (let [ret (pred x)]
-                         (if cpred?
-                           ret
-                           (if ret x ::invalid))))
-      :explain (fn [_ path via in x]
-                 (when (invalid? (dt pred x form cpred?))
-                   [{:path path :pred form :val x :via via :in in}]))
-      :describe (fn [_] form)})))
-
+  ([form pred gfn cpred? _unc]
+     (cond
+      (spec? pred) pred ;; (cond-> pred gfn (with-gen gfn))
+      (regex? pred) (regex-spec-impl pred gfn)
+      (ident? pred) (the-spec pred) #_(cond-> (the-spec pred) gfn (with-gen gfn))
+      :else
+      {:type ::spec
+       :form form
+       :cform (fn [_ x] (let [ret (pred x)]
+                          (if cpred?
+                            ret
+                            (if ret x ::invalid))))
+       :explain (fn [_ path via in x]
+                  (when (invalid? (dt pred x form cpred?))
+                    [{:path path :pred form :val x :via via :in in}]))
+       :describe (fn [_] form)})))
 ;;; 948
 (defn multi-spec-impl [mm retag]
   (let [id (gensym)
