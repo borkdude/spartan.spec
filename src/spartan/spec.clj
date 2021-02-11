@@ -288,6 +288,12 @@
   [spec x]
   (explain-out (explain-data spec x)))
 
+;; 272:
+(defn explain-str
+  "Given a spec and a value that fails to conform, returns an explanation as a string."
+  ^String [spec x]
+  (with-out-str (explain spec x)))
+
 ;; 277
 (declare valid?)
 
@@ -1311,17 +1317,18 @@
 (defn regex-spec-impl
   "Do not call this directly, use 'spec' with a regex op argument"
   [re gfn]
-  (assoc re
-         :type ::spec
-         :cform (fn [_ x]
-                  (if (c/or (nil? x) (sequential? x))
-                    (re-conform re (seq x))
-                    ::invalid))
-         :explain (fn [_ path via in x]
-                    (if (c/or (nil? x) (sequential? x))
-                      (re-explain path via in re (seq x))
-                      [{:path path :pred (res `#(c/or (nil? %) (sequential? %))) :val x :via via :in in}]))
-         :describe (fn [_] (op-describe re))))
+  (-> re
+      (dissoc ::op)
+      (assoc  :type ::spec
+              :cform (fn [_ x]
+                       (if (c/or (nil? x) (sequential? x))
+                         (re-conform re (seq x))
+                         ::invalid))
+              :explain (fn [_ path via in x]
+                         (if (c/or (nil? x) (sequential? x))
+                           (re-explain path via in re (seq x))
+                           [{:path path :pred (res `#(c/or (nil? %) (sequential? %))) :val x :via via :in in}]))
+              :describe (fn [_] (op-describe re)))))
 
 ;; 1737
 (defn- validate-fn
@@ -1408,6 +1415,36 @@
   [pred]
   (let [pf (res pred)]
     `(nilable-impl '~pf ~pred)))
+
+;; 1910
+(defn int-in-range?
+  "Return true if start <= val, val < end and val is a fixed
+  precision integer."
+  [start end val]
+  (c/and (int? val) (<= start val) (< val end)))
+
+;; 1916
+(defmacro int-in
+  "Returns a spec that validates fixed precision integers in the
+  range from start (inclusive) to end (exclusive)."
+  [start end]
+  `(spec (and int? #(int-in-range? ~start ~end %))))
+
+;; 1923
+(defmacro double-in
+  "Specs a 64-bit floating point number. Options:
+    :infinite? - whether +/- infinity allowed (default true)
+    :NaN?      - whether NaN allowed (default true)
+    :min       - minimum value (inclusive, default none)
+    :max       - maximum value (inclusive, default none)"
+  [& {:keys [infinite? NaN? min max]
+    :or {infinite? true NaN? true}
+    :as m}]
+  `(spec (and c/double?
+              ~@(when-not infinite? '[#(not (Double/isInfinite %))])
+              ~@(when-not NaN? '[#(not (Double/isNaN %))])
+              ~@(when max `[#(<= % ~max)])
+              ~@(when min `[#(<= ~min %)]))))
 
 ;; 1941
 #_(defonce

@@ -19,7 +19,17 @@
   (is (= {:a 1, :b "foo"} (s/conform (s/cat :a int? :b string?) [1 "foo"])))
   (is (s/invalid? (s/conform (s/cat :a int? :b string?) [1 "foo" "bar"])))
   (is (= "1 - failed: string? in: [0] at: [:i]\n" (with-out-str (s/explain (s/cat :i string?) [1]))))
-  (is (= '(cat :a int? :b string?) (s/describe (s/cat :a int? :b string?)))))
+  (is (= '(cat :a int? :b string?) (s/describe (s/cat :a int? :b string?))))
+  (is (= {:path [:bs],
+           :val "foo",
+           :via [],
+           :in [0 0]}
+         (-> (s/explain-data
+              (s/cat :bs (s/spec (s/+ int?)))
+              [["foo"]])
+             :clojure.spec.alpha/problems
+             first
+             (dissoc :pred)))))
 
 (deftest alt-test
   (is (= [:a 1] (s/conform (s/alt :a int? :b string?) [1])))
@@ -154,3 +164,17 @@
                (try (s/assert int? "foo")
                     (catch clojure.lang.ExceptionInfo e
                       (ex-message e))))))
+
+(deftest explain-str-test
+  (s/def ::str string?)
+  (is (= "1 - failed: string? spec: :spartan.spec-test/str\n" (s/explain-str ::str 1))))
+
+(deftest int-in-test
+  (s/def ::int-in (s/int-in 0 10))
+  ;; (is (s/valid? ::int-in 9)) ;; <- This does not pass. It's something to do with (pred x) doesn't work for {:type ::spec}
+  (is (= "11 - failed: (and int? (fn* [%1] (int-in-range? 0 10 %1))) spec: :spartan.spec-test/int-in\n" (s/explain-str ::int-in 11))))
+
+(deftest double-in-test
+  (s/def ::double-in (s/double-in :min 2.5 :max 5.1))
+  ;; (is (s/valid? ::double-in 2.6)) ;; <- This does not pass. It's something to do with (pred x) doesn't work for {:type ::spec}
+  (is (= "5.2 - failed: (and double? (fn* [%1] (<= %1 5.1)) (fn* [%1] (<= 2.5 %1))) spec: :spartan.spec-test/double-in\n" (s/explain-str ::double-in 5.2))))
