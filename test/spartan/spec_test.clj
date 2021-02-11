@@ -182,12 +182,12 @@
 "
               (s/explain-str :alt-spec/one-many-int-or-str [[:one]])))))
 
-#_(deftest int-in-test
+(deftest int-in-test
   (s/def ::int-in (s/int-in 0 10))
-  ;; (is (s/valid? ::int-in 9)) ;; <- This does not pass. It's something to do with (pred x) doesn't work for {:type ::spec}
-  (is (= "11 - failed: (and int? (fn* [%1] (int-in-range? 0 10 %1))) spec: :spartan.spec-test/int-in\n" (s/explain-str ::int-in 11))))
+  (is (s/valid? ::int-in 9))
+  (is (= "11 - failed: (int-in-range? 0 10 %) spec: :spartan.spec-test/int-in\n" (s/explain-str ::int-in 11))))
 
-#_(deftest double-in-test
+(deftest double-in-test
   (s/def ::double-in (s/double-in :min 2.5 :max 5.1))
-  ;; (is (s/valid? ::double-in 2.6)) ;; <- This does not pass. It's something to do with (pred x) doesn't work for {:type ::spec}
-  (is (= "5.2 - failed: (and double? (fn* [%1] (<= %1 5.1)) (fn* [%1] (<= 2.5 %1))) spec: :spartan.spec-test/double-in\n" (s/explain-str ::double-in 5.2))))
+  (is (s/valid? ::double-in 2.6))
+  (is (= "5.2 - failed: (<= % 5.1) spec: :spartan.spec-test/double-in\n" (s/explain-str ::double-in 5.2))))
