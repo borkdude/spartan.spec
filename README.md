@@ -41,16 +41,13 @@ This is an example that you can run with babashka:
 
 (deps/add-deps
  '{:deps {borkdude/spartan.spec {:git/url "https://github.com/borkdude/spartan.spec"
-                                 :sha "bf4ace4a857c29cbcbb934f6a4035cfabe173ff1"}
-          expound/expound {:mvn/version "0.8.7"}}})
+                                 :sha "d3b4e98ec2b8504868e5a6193515c5d23df15264"}
+          expound/expound {:mvn/version "0.8.8"}}})
 
 ;; Loading spartan.spec will create a namespace clojure.spec.alpha for compatibility:
-(require 'spartan.spec)
-(require '[clojure.spec.alpha :as s])
-
-;; Expound expects some vars to be there, like `with-gen`. Spartan prints warnings that these are used, but doesn't implement them yet.
-(binding [*err* (java.io.StringWriter.)]
-  (require '[expound.alpha :as expound]))
+(require 'spartan.spec
+         '[clojure.spec.alpha :as s]
+         '[expound.alpha :as expound])
 
 (s/def ::a (s/cat :i int? :j string?))
 
