@@ -4,12 +4,12 @@
 (deps/add-deps
  '{:deps {borkdude/spartan.spec {:git/url "https://github.com/borkdude/spartan.spec"
                                  :sha "bf4ace4a857c29cbcbb934f6a4035cfabe173ff1"}
-          expound/expound {:mvn/version "0.8.7"}}})
+          expound/expound {:mvn/version "0.8.9"}}})
 
 (require 'spartan.spec)
-(require '[clojure.spec.alpha :as s])
+(alias 's 'clojure.spec.alpha)
 
-(binding [*err* (java.io.StringWriter.)] (require '[expound.alpha :as expound]))
+(require '[expound.alpha :as expound])
 
 (s/def ::a (s/cat :i int? :j string?))
 
