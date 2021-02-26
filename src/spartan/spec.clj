@@ -314,15 +314,9 @@
         :else x))
 ;; 314
 (defn- unfn [expr]
-  (if (c/and
-       (seq? expr)
-       (let [fe (first expr)]
-         (c/and (symbol? fe)
-                           (let [n (name fe)]
-                             ;; TODO: should we force edamame to produce fn*
-                             ;; while parsing anon fns?
-                             (c/or (= "fn*" n)
-                                              (= "fn" n))))))
+  (if (c/and (seq? expr)
+             (symbol? (first expr))
+             (= "fn*" (name (first expr))))
     (let [[[s] & form] (rest expr)]
       (conj (walk/postwalk-replace {s '%} form) '[%] 'fn))
     expr))

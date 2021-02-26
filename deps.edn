@@ -1,5 +1,3 @@
 {:aliases {:expound {:extra-deps {expound/expound {:mvn/version "0.8.7"}}}
            :crucible {:extra-deps {crucible/crucible {:mvn/version "0.46.0"}}}
-           :test {:extra-paths ["test"]
-                  :extra-deps {borkdude/spartan.test {:mvn/version "0.0.4"}}
-                  :main-opts ["-m" "spartan.test" "-n" "spartan.spec-test"]}}}
+           :test {:extra-paths ["test"]}}}

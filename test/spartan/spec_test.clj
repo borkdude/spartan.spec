@@ -1,7 +1,7 @@
 (ns spartan.spec-test
   (:require
    [clojure.string :as str]
-   [spartan.test :as t :refer [deftest is]]))
+   [clojure.test :as t :refer [deftest is testing]]))
 
 (require 'spartan.spec) ;; side effect
 
@@ -191,3 +191,13 @@
   (s/def ::double-in (s/double-in :min 2.5 :max 5.1))
   (is (s/valid? ::double-in 2.6))
   (is (= "5.2 - failed: (<= % 5.1) spec: :spartan.spec-test/double-in\n" (s/explain-str ::double-in 5.2))))
+
+(defn gh-19-spec []
+  (s/&
+   (s/cat :args ::arg-list)
+   (fn arg-specs-match-param-count? [_]
+     true)))
+
+(deftest amp-pred-test
+  (testing "GH-19"
+    (is (gh-19-spec))))
