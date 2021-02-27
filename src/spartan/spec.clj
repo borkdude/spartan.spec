@@ -787,6 +787,16 @@
                              ::invalid
                              (recur (if (identical? cv v) ret (assoc ret i cv))
                                     (inc i)))))))))
+        :unform (fn [_ x]
+                  (c/assert (c/and (vector? x)
+                                   (= (count x) (count preds))))
+                  (loop [ret x, i 0]
+                    (if (= i (count x))
+                      ret
+                      (let [cv (x i)
+                            v (unform (preds i) cv)]
+                        (recur (if (identical? cv v) ret (assoc ret i v))
+                          (inc i))))))
         :explain (fn [_ path via in x]
                    (cond
                      (not (vector? x))
