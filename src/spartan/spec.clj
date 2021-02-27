@@ -1204,6 +1204,28 @@
                   r (if (nil? p0) ::nil (preturn p0))]
               (if k0 (tagged-ret k0 r) r)))))
 
+; 1487
+(defn- op-unform [p x]
+  ;;(prn {:p p :x x})
+  (let [{[p0 & pr :as ps] :ps, [k :as ks] :ks, :keys [::op p1 ret forms rep+ maybe] :as p} (reg-resolve! p)
+        kps (zipmap ks ps)]
+    (case op
+      ::accept [ret]
+      nil [(unform p x)]
+      ::amp (let [px (reduce #(unform %2 %1) x (reverse ps))]
+              (op-unform p1 px))
+      ::rep (mapcat #(op-unform p1 %) x)
+      ::pcat (if rep+
+               (mapcat #(op-unform p0 %) x)
+               (mapcat (fn [k]
+                         (when (contains? x k)
+                           (op-unform (kps k) (get x k))))
+                 ks))
+      ::alt (if maybe
+              [(unform p0 x)]
+              (let [[k v] x]
+                (op-unform (kps k) v))))))
+
 ;; 1515
 (defn- add-ret [p r k]
   (let [{:keys [::op ps splice] :as p} (reg-resolve! p)
@@ -1364,6 +1386,7 @@
                        (if (c/or (nil? x) (sequential? x))
                          (re-conform re (seq x))
                          ::invalid))
+              :unform (fn [_ x] (op-unform re x))
               :explain (fn [_ path via in x]
                          (if (c/or (nil? x) (sequential? x))
                            (re-explain path via in re (seq x))
