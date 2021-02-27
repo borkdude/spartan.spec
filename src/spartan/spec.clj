@@ -1418,6 +1418,7 @@
                         (if (identical? f (validate-fn f specs *fspec-iterations*)) f ::invalid)
                         ::invalid)
                       (throw (Exception. (str "Can't conform fspec without args spec: " (pr-str (describe this)))))))
+           :unform (fn [_ f] f)
            :explain (fn [_ path via in f]
                       (if (ifn? f)
                         (let [args (validate-fn f specs 100)]
