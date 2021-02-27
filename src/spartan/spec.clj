@@ -689,6 +689,17 @@
                            (recur ret ks)))
                        ret)))
                  ::invalid))
+     :unform  (fn [_ m]
+                (let [reg (registry)]
+                  (loop [ret m, [k & ks :as keys] (c/keys m)]
+                    (if keys
+                      (if (contains? reg (keys->specnames k))
+                        (let [cv (get m k)
+                              v (unform (keys->specnames k) cv)]
+                          (recur (if (identical? cv v) ret (assoc ret k v))
+                            ks))
+                        (recur ret ks))
+                      ret))))
      :explain (fn [_ path via in x]
                (if-not (map? x)
                  [{:path path :pred `map? :val x :via via :in in}]
