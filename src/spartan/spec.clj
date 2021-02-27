@@ -1466,6 +1466,7 @@
   (let [spec (delay (specize pred form))]
     {:type ::spec
      :cform (fn [_ x] (if (nil? x) nil (conform* @spec x)))
+     :unform (fn [_ x] (if (nil? x) nil (unform* @spec x)))
      :explain (fn [_ path via in x]
                 (when-not (c/or (pvalid? @spec x) (nil? x))
                   (conj
