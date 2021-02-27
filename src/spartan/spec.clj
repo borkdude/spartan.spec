@@ -170,10 +170,26 @@
   (conform* (specize spec) x))
 
 ;; 173
-;; unform: TODO
-(defmacro unform [& _args]
-  (binding [*out* *err*]
-    (prn "WARNING: spartan.spec doesn't have unform yet")))
+(declare op-unform)
+
+(defn unform* [spec x]
+  (cond (regex? spec)
+        (if (c/or (nil? x) (sequential? x))
+          (op-unform spec (seq x))
+          ::invalid)
+        (:unform spec)
+        ((:unform spec) spec x)
+        :else
+        (throw (ex-info "No unform function implemented yet."
+                 {:spec spec
+                  :x x}))))
+
+(defn unform
+  "Given a spec and a value created by or compliant with a call to
+  'conform' with the same spec, returns a value with all conform
+  destructuring undone."
+  [spec x]
+  (unform* (specize spec) x))
 
 (defn describe* [spec]
   (if-let [d (:describe spec)]
@@ -744,7 +760,7 @@
                  (if cpred?
                    (if unc
                      (unc x)
-                     (throw (IllegalStateException. "no unform fn for conformer")))
+                     (throw (Exception. "no unform fn for conformer")))
                    x))
        :explain (fn [_ path via in x]
                   (when (invalid? (dt pred x form cpred?))
@@ -754,8 +770,7 @@
 (defn multi-spec-impl [mm retag]
   (let [id (gensym)
         predx #(let [mm mm]
-                 (mm %))
-        dval #((.dispatchFn ^clojure.lang.MultiFn @mm) %)]
+                 (mm %))]
     {:type   ::spec
      :cform  (fn [_ x]
                (if-let [pred (predx x)]
@@ -764,7 +779,7 @@
      :unform (fn [_ x]
                (if-let [pred (predx x)]
                          (unform pred x)
-                         (throw (IllegalStateException. (str "No method of: " form " for dispatch value: " (dval x))))))}))
+                         (throw (Exception. (str "No method of: " form " for dispatch value: " #_ (dval x))))))}))
 ;; 998
 (defn ^:skip-wiki tuple-impl
   "Do not call this directly, use 'tuple'"
@@ -1458,6 +1473,22 @@
   `(let [mspec# (clojure.spec.alpha/keys ~@kspecs)]
      ;; NOTE: deleted with/gen
      (clojure.spec.alpha/& (clojure.spec.alpha/* (clojure.spec.alpha/cat ::k keyword? ::v any?)) ::kvs->map mspec#)))
+
+; 1808
+(defn ^:skip-wiki nonconforming
+  "takes a spec and returns a spec that has the same properties except
+  'conform' returns the original (not the conformed) value. Note, will specize regex ops."
+  [spec]
+  (let [spec (delay (specize spec))]
+    {:type ::spec
+     :cform (fn [_ x]
+              (let [ret (conform* @spec x)]
+                (if (invalid? ret)
+                  ::invalid
+                  x)))
+     :unform (fn [_ x] x)
+     :explain (fn [_ path via in x] (explain* @spec path via in x))
+     :describe (fn [_] `(nonconforming ~(describe* @spec)))}))
 
 ;; 1836
 (defn nilable-impl
