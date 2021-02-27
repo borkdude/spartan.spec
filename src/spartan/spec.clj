@@ -754,13 +754,17 @@
 (defn multi-spec-impl [mm retag]
   (let [id (gensym)
         predx #(let [mm mm]
-                 (mm %))]
-    {:type ::spec
+                 (mm %))
+        dval #((.dispatchFn ^clojure.lang.MultiFn @mm) %)]
+    {:type   ::spec
      :cform  (fn [_ x]
                (if-let [pred (predx x)]
                  (dt pred x nil #_form)
-                 ::invalid))}))
-
+                 ::invalid))
+     :unform (fn [_ x]
+               (if-let [pred (predx x)]
+                         (unform pred x)
+                         (throw (IllegalStateException. (str "No method of: " form " for dispatch value: " (dval x))))))}))
 ;; 998
 (defn ^:skip-wiki tuple-impl
   "Do not call this directly, use 'tuple'"
