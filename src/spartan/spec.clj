@@ -170,10 +170,26 @@
   (conform* (specize spec) x))
 
 ;; 173
-;; unform: TODO
-(defmacro unform [& _args]
-  (binding [*out* *err*]
-    (prn "WARNING: spartan.spec doesn't have unform yet")))
+(declare op-unform)
+
+(defn unform* [spec x]
+  (cond (regex? spec)
+        (if (c/or (nil? x) (sequential? x))
+          (op-unform spec (seq x))
+          ::invalid)
+        (:unform spec)
+        ((:unform spec) spec x)
+        :else
+        (throw (ex-info "No unform function implemented yet."
+                 {:spec spec
+                  :x x}))))
+
+(defn unform
+  "Given a spec and a value created by or compliant with a call to
+  'conform' with the same spec, returns a value with all conform
+  destructuring undone."
+  [spec x]
+  (unform* (specize spec) x))
 
 (defn describe* [spec]
   (if-let [d (:describe spec)]
@@ -689,6 +705,17 @@
                            (recur ret ks)))
                        ret)))
                  ::invalid))
+     :unform  (fn [_ m]
+                (let [reg (registry)]
+                  (loop [ret m, [k & ks :as keys] (c/keys m)]
+                    (if keys
+                      (if (contains? reg (keys->specnames k))
+                        (let [cv (get m k)
+                              v (unform (keys->specnames k) cv)]
+                          (recur (if (identical? cv v) ret (assoc ret k v))
+                            ks))
+                        (recur ret ks))
+                      ret))))
      :explain (fn [_ path via in x]
                (if-not (map? x)
                  [{:path path :pred `map? :val x :via via :in in}]
@@ -717,7 +744,7 @@
 (defn ^:skip-wiki spec-impl
   "Do not call this directly, use 'spec'"
   ([form pred gfn cpred?] (spec-impl form pred gfn cpred? nil))
-  ([form pred gfn cpred? _unc]
+  ([form pred gfn cpred? unc]
      (cond
       (spec? pred) pred ;; (cond-> pred gfn (with-gen gfn))
       (regex? pred) (regex-spec-impl pred gfn)
@@ -729,6 +756,12 @@
                           (if cpred?
                             ret
                             (if ret x ::invalid))))
+       :unform (fn [_ x]
+                 (if cpred?
+                   (if unc
+                     (unc x)
+                     (throw (Exception. "no unform fn for conformer")))
+                   x))
        :explain (fn [_ path via in x]
                   (when (invalid? (dt pred x form cpred?))
                     [{:path path :pred form :val x :via via :in in}]))
@@ -738,12 +771,15 @@
   (let [id (gensym)
         predx #(let [mm mm]
                  (mm %))]
-    {:type ::spec
+    {:type   ::spec
      :cform  (fn [_ x]
                (if-let [pred (predx x)]
                  (dt pred x nil #_form)
-                 ::invalid))}))
-
+                 ::invalid))
+     :unform (fn [_ x]
+               (if-let [pred (predx x)]
+                         (unform pred x)
+                         (throw (Exception. (str "No method of: " form " for dispatch value: " #_ (dval x))))))}))
 ;; 998
 (defn ^:skip-wiki tuple-impl
   "Do not call this directly, use 'tuple'"
@@ -766,6 +802,16 @@
                              ::invalid
                              (recur (if (identical? cv v) ret (assoc ret i cv))
                                     (inc i)))))))))
+        :unform (fn [_ x]
+                  (c/assert (c/and (vector? x)
+                                   (= (count x) (count preds))))
+                  (loop [ret x, i 0]
+                    (if (= i (count x))
+                      ret
+                      (let [cv (x i)
+                            v (unform (preds i) cv)]
+                        (recur (if (identical? cv v) ret (assoc ret i v))
+                          (inc i))))))
         :explain (fn [_ path via in x]
                    (cond
                      (not (vector? x))
@@ -790,7 +836,7 @@
 (defn or-spec-impl
   [keys forms preds]
   (let [id (java.util.UUID/randomUUID)
-        ;; kps (zipmap keys preds)
+        kps (zipmap keys preds)
         specs (delay (mapv specize preds forms))
         cform (case (count preds)
                 2 (fn [x]
@@ -828,6 +874,7 @@
     {:type ::spec
      :id id
      :cform (fn [_ x] (cform x))
+     :unform (fn [_ [k x]] (unform (kps k) x))
      :explain (fn [this path via in x]
                 (when-not (pvalid? this x)
                   (apply concat
@@ -896,6 +943,7 @@
                       ret)))))]
     {:type ::spec
      :cform (fn [_ x] (cform x))
+     :unform (fn [_ x] (reduce #(unform %2 %1) x (reverse preds)))
      :explain (fn [_ path via in x] (explain-pred-list forms preds path via in x))
      :describe (fn [_] `(and ~@forms))}))
 
@@ -908,6 +956,7 @@
                       (if (some invalid? ms)
                         ::invalid
                         (apply c/merge ms))))
+   :unform (fn [_ x] (apply c/merge (map #(unform % x) (reverse preds))))
    :explain (fn [_ path via in x]
               (apply concat
                      (map #(explain-1 %1 %2 path via in x)
@@ -1006,6 +1055,15 @@
                              (c/or (nil? vseq) (= i limit)) x
                              (valid? spec v) (recur (inc i) vs)
                              :else ::invalid)))))))
+        :unform (fn [_ x]
+                  (if conform-all
+                    (let [spec @spec
+                          [init add complete] (cfns x)]
+                      (loop [ret (init x), i 0, [v & vs :as vseq] (seq x)]
+                        (if (>= i (c/count x))
+                          (complete ret)
+                          (recur (add ret i v (unform* spec v)) (inc i) vs))))
+                    x))
         :explain (fn [_ path via in x]
                    (c/or (coll-prob x kind kind-form distinct count min-count max-count
                                                path via in)
@@ -1160,6 +1218,28 @@
       ::alt (let [[[p0] [k0]] (filter-alt ps ks forms accept-nil?)
                   r (if (nil? p0) ::nil (preturn p0))]
               (if k0 (tagged-ret k0 r) r)))))
+
+; 1487
+(defn- op-unform [p x]
+  ;;(prn {:p p :x x})
+  (let [{[p0 & pr :as ps] :ps, [k :as ks] :ks, :keys [::op p1 ret forms rep+ maybe] :as p} (reg-resolve! p)
+        kps (zipmap ks ps)]
+    (case op
+      ::accept [ret]
+      nil [(unform p x)]
+      ::amp (let [px (reduce #(unform %2 %1) x (reverse ps))]
+              (op-unform p1 px))
+      ::rep (mapcat #(op-unform p1 %) x)
+      ::pcat (if rep+
+               (mapcat #(op-unform p0 %) x)
+               (mapcat (fn [k]
+                         (when (contains? x k)
+                           (op-unform (kps k) (get x k))))
+                 ks))
+      ::alt (if maybe
+              [(unform p0 x)]
+              (let [[k v] x]
+                (op-unform (kps k) v))))))
 
 ;; 1515
 (defn- add-ret [p r k]
@@ -1321,6 +1401,7 @@
                        (if (c/or (nil? x) (sequential? x))
                          (re-conform re (seq x))
                          ::invalid))
+              :unform (fn [_ x] (op-unform re x))
               :explain (fn [_ path via in x]
                          (if (c/or (nil? x) (sequential? x))
                            (re-explain path via in re (seq x))
@@ -1352,6 +1433,7 @@
                         (if (identical? f (validate-fn f specs *fspec-iterations*)) f ::invalid)
                         ::invalid)
                       (throw (Exception. (str "Can't conform fspec without args spec: " (pr-str (describe this)))))))
+           :unform (fn [_ f] f)
            :explain (fn [_ path via in f]
                       (if (ifn? f)
                         (let [args (validate-fn f specs 100)]
@@ -1392,6 +1474,22 @@
      ;; NOTE: deleted with/gen
      (clojure.spec.alpha/& (clojure.spec.alpha/* (clojure.spec.alpha/cat ::k keyword? ::v any?)) ::kvs->map mspec#)))
 
+; 1808
+(defn ^:skip-wiki nonconforming
+  "takes a spec and returns a spec that has the same properties except
+  'conform' returns the original (not the conformed) value. Note, will specize regex ops."
+  [spec]
+  (let [spec (delay (specize spec))]
+    {:type ::spec
+     :cform (fn [_ x]
+              (let [ret (conform* @spec x)]
+                (if (invalid? ret)
+                  ::invalid
+                  x)))
+     :unform (fn [_ x] x)
+     :explain (fn [_ path via in x] (explain* @spec path via in x))
+     :describe (fn [_] `(nonconforming ~(describe* @spec)))}))
+
 ;; 1836
 (defn nilable-impl
   "Do not call this directly, use 'nilable'"
@@ -1399,6 +1497,7 @@
   (let [spec (delay (specize pred form))]
     {:type ::spec
      :cform (fn [_ x] (if (nil? x) nil (conform* @spec x)))
+     :unform (fn [_ x] (if (nil? x) nil (unform* @spec x)))
      :explain (fn [_ path via in x]
                 (when-not (c/or (pvalid? @spec x) (nil? x))
                   (conj
