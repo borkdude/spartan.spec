@@ -728,7 +728,7 @@
 (defn ^:skip-wiki spec-impl
   "Do not call this directly, use 'spec'"
   ([form pred gfn cpred?] (spec-impl form pred gfn cpred? nil))
-  ([form pred gfn cpred? _unc]
+  ([form pred gfn cpred? unc]
      (cond
       (spec? pred) pred ;; (cond-> pred gfn (with-gen gfn))
       (regex? pred) (regex-spec-impl pred gfn)
@@ -740,6 +740,12 @@
                           (if cpred?
                             ret
                             (if ret x ::invalid))))
+       :unform (fn [_ x]
+                 (if cpred?
+                   (if unc
+                     (unc x)
+                     (throw (IllegalStateException. "no unform fn for conformer")))
+                   x))
        :explain (fn [_ path via in x]
                   (when (invalid? (dt pred x form cpred?))
                     [{:path path :pred form :val x :via via :in in}]))
