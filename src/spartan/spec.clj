@@ -941,6 +941,7 @@
                       (if (some invalid? ms)
                         ::invalid
                         (apply c/merge ms))))
+   :unform (fn [_ x] (apply c/merge (map #(unform % x) (reverse preds))))
    :explain (fn [_ path via in x]
               (apply concat
                      (map #(explain-1 %1 %2 path via in x)
