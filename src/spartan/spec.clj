@@ -821,7 +821,7 @@
 (defn or-spec-impl
   [keys forms preds]
   (let [id (java.util.UUID/randomUUID)
-        ;; kps (zipmap keys preds)
+        kps (zipmap keys preds)
         specs (delay (mapv specize preds forms))
         cform (case (count preds)
                 2 (fn [x]
@@ -859,6 +859,7 @@
     {:type ::spec
      :id id
      :cform (fn [_ x] (cform x))
+     :unform (fn [_ [k x]] (unform (kps k) x))
      :explain (fn [this path via in x]
                 (when-not (pvalid? this x)
                   (apply concat
