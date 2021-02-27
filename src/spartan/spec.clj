@@ -928,6 +928,7 @@
                       ret)))))]
     {:type ::spec
      :cform (fn [_ x] (cform x))
+     :unform (fn [_ x] (reduce #(unform %2 %1) x (reverse preds)))
      :explain (fn [_ path via in x] (explain-pred-list forms preds path via in x))
      :describe (fn [_] `(and ~@forms))}))
 
