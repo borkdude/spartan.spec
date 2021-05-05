@@ -25,8 +25,8 @@ which will be more performant than this interpreted version.
 Usage in a `deps.edn` project:
 
 ``` clojure
-{:deps {borkdude/spartan.spec {:git/url "https://github.com/borkdude/spartan.spec"
-                               :sha "e5c9f40ebcc64b27b3e3e83ad2a285ccc0997097"}}}
+borkdude/spartan.spec {:git/url "https://github.com/borkdude/spartan.spec"
+                       :sha "12947185b4f8b8ff8ee3bc0f19c98dbde54d4c90"}
 ```
 
 Requiring `spartan.spec` will create a namespace `clojure.spec.alpha` for compatibility.
@@ -41,7 +41,7 @@ This is an example that you can run with babashka:
 
 (deps/add-deps
  '{:deps {borkdude/spartan.spec {:git/url "https://github.com/borkdude/spartan.spec"
-                                 :sha "bf4ace4a857c29cbcbb934f6a4035cfabe173ff1"}
+                                 :sha "12947185b4f8b8ff8ee3bc0f19c98dbde54d4c90"}
           expound/expound {:mvn/version "0.8.9"}}})
 
 ;; Loading spartan.spec will create a namespace clojure.spec.alpha for compatibility:
