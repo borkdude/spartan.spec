@@ -4,6 +4,8 @@
 <!-- [![Clojars Project](https://img.shields.io/clojars/v/borkdude/spartan.test.svg)](https://clojars.org/borkdude/spartan.test) -->
 [![project chat](https://img.shields.io/badge/slack-join_chat-brightgreen.svg)](https://app.slack.com/client/T03RZGPFR/CLX41ASCS)
 
+This project is archived in favor of [babashka/spec.alpha](https://github.com/babashka/spec.alpha).
+
 A spartan implementation of clojure.spec.alpha compatible with
 [babashka](https://github.com/borkdude/babashka) (>= 0.2.5) and Clojure.
 
